@@ -1,0 +1,80 @@
+// prisma/schema.prisma
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")     // TiDB connection string
+}
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id              BigInt  @id @default(autoincrement())
+  email           String  @unique
+  name            String?
+  country         String?
+  yearsExperience Decimal? @db.Decimal(4,1)
+  createdAt       DateTime @default(now())
+  skills          UserSkill[]
+  resume          Resume?
+  simulations     Simulation[]
+}
+
+model UserSkill {
+  userId     BigInt
+  skillName  String
+  proficiency Int    // 1-5
+  years      Decimal? @db.Decimal(4,1)
+  lastUsed   DateTime?
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, skillName])
+}
+
+model Resume {
+  userId   BigInt  @id
+  rawText  String  @db.LongText 
+  embedding Bytes?
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Job {
+  id         BigInt   @id @default(autoincrement())
+  source     String
+  externalId String
+  title      String
+  company    String?
+  location   String?
+  minSalary  Int?
+  maxSalary  Int?
+  currency   String?  @default("USD")
+  postDate   DateTime?
+  url        String? @db.LongText
+  text       JobText?
+}
+
+model JobText {
+  jobId       BigInt  @id
+  description String  @db.LongText 
+  embedding   Unsupported("VECTOR")?
+  job         Job     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+}
+
+model Simulation {
+  id            BigInt   @id @default(autoincrement())
+  userId        BigInt
+  pathName      String
+  durationWeeks Int
+  createdAt     DateTime @default(now())
+  steps         SimulationStep[]    @relation("SimulationToSteps")
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model SimulationStep {
+  simId                 BigInt
+  week                  Int
+  addedSkills           Json
+  estQualificationScore Decimal @db.Decimal(5,2)
+  simulation            Simulation @relation("SimulationToSteps", fields: [simId], references: [id], onDelete: Cascade)
+
+  @@id([simId, week])
+}

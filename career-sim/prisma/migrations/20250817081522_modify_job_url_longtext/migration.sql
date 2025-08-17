@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE `Job` MODIFY `url` LONGTEXT NULL;
