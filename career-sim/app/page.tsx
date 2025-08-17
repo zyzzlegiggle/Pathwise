@@ -1,6 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  CardFooter,
+} from "@/components/ui/card";
 
 type JobResult = {
   id: number;
@@ -14,7 +25,7 @@ type JobResult = {
 export default function HomePage() {
   const [resume, setResume] = useState("");
   const [role, setRole] = useState("software engineer");
-  const [location, setLocation] = useState("Singapore"); // or "Kuala Lumpur"
+  const [location, setLocation] = useState("Singapore");
   const [remoteOnly, setRemoteOnly] = useState(false);
 
   const [loading, setLoading] = useState(false);
@@ -64,7 +75,6 @@ export default function HomePage() {
     try {
       const res = await fetch("/api/similar?userId=1");
       const data = await res.json();
-      
       setJobs(data.jobs || []);
       setMessage(`Found ${data.jobs?.length || 0} jobs`);
     } catch {
@@ -78,28 +88,25 @@ export default function HomePage() {
     <main className="p-8 max-w-3xl mx-auto space-y-6">
       <h1 className="text-2xl font-bold">Career Clone Demo</h1>
 
+      {/* Resume uploader */}
       <section className="space-y-2">
         <label className="block font-medium">Paste Resume</label>
-        <textarea
+        <Textarea
           value={resume}
-          onChange={(e) => setResume(e.target.value)}
-          className="w-full h-40 border rounded p-2"
+          onChange={(e: any) => setResume(e.target.value)}
           placeholder="Paste resume text here..."
+          className="h-40"
         />
-        <button
-          onClick={uploadResume}
-          disabled={loading}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-        >
+        <Button onClick={uploadResume} disabled={loading}>
           Upload Resume
-        </button>
+        </Button>
       </section>
 
+      {/* Search controls */}
       <section className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
         <div className="space-y-1">
           <label className="block text-sm font-medium">Role / Keyword</label>
-          <input
-            className="w-full border rounded p-2"
+          <Input
             value={role}
             onChange={(e) => setRole(e.target.value)}
             placeholder="e.g., backend developer"
@@ -107,79 +114,64 @@ export default function HomePage() {
         </div>
         <div className="space-y-1">
           <label className="block text-sm font-medium">Location</label>
-          <input
-            className="w-full border rounded p-2"
+          <Input
             value={location}
             onChange={(e) => setLocation(e.target.value)}
             placeholder="e.g., Kuala Lumpur"
           />
         </div>
-        <div className="flex items-center gap-2">
-          <input
+        <div className="flex items-center space-x-2">
+          <Checkbox
             id="remoteOnly"
-            type="checkbox"
             checked={remoteOnly}
-            onChange={(e) => setRemoteOnly(e.target.checked)}
+            onCheckedChange={(v) => setRemoteOnly(Boolean(v))}
           />
-          <label htmlFor="remoteOnly">Remote only</label>
+          <label htmlFor="remoteOnly" className="text-sm">
+            Remote only
+          </label>
         </div>
       </section>
 
+      {/* Actions */}
       <div className="flex gap-4">
-        <button
-          onClick={fetchJobs}
-          disabled={loading}
-          className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-        >
+        <Button onClick={fetchJobs} disabled={loading} variant="secondary">
           Fetch JSearch
-        </button>
-
-        <button
-          onClick={findSimilar}
-          disabled={loading}
-          className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
-        >
+        </Button>
+        <Button onClick={findSimilar} disabled={loading} variant="outline">
           Find Similar Jobs
-        </button>
+        </Button>
       </div>
 
       {message && <p className="text-gray-700">{message}</p>}
 
-      {jobs.length > 0 && (
-        <table className="w-full border mt-4">
-          <thead>
-            <tr className="bg-gray-100">
-              <th className="p-2 border">Title</th>
-              <th className="p-2 border">Company</th>
-              <th className="p-2 border">Location</th>
-              <th className="p-2 border">Score</th>
-              <th className="p-2 border">Link</th>
-            </tr>
-          </thead>
-          <tbody>
-            {jobs.map((job) => (
-              
-              <tr key={job.id}>
-                <td className="p-2 border">{job.title}</td>
-                <td className="p-2 border">{job.company}</td>
-                <td className="p-2 border">{job.location}</td>
-                <td className="p-2 border">{(job.score * 100).toFixed(1)}%</td>
-                <td className="p-2 border">
-                  <a
-                    href={job.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-blue-600 underline"
-                  >
-                    View
-                  </a>
-                </td>
-            </tr>
-
-            ))}
-          </tbody>
-        </table>
-      )}
+      {/* Job results */}
+      <div className="grid gap-4 mt-6">
+        {jobs.map((job) => (
+          <Card key={job.id} className="shadow-sm">
+            <CardHeader>
+              <CardTitle>{job.title}</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                {job.company} • {job.location}
+              </p>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm">
+                Match Score: <strong>{(job.score * 100).toFixed(1)}%</strong>
+              </p>
+            </CardContent>
+            <CardFooter>
+              <a
+                href={job.url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-blue-600 underline text-sm"
+              >
+                View job posting
+              </a>
+            </CardFooter>
+          </Card>
+        ))}
+      </div>
     </main>
   );
 }
