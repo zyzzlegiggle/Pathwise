@@ -1,10 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
+function jsonSafe<T>(v: T): T {
+  if (typeof v === "bigint") return (String(v) as unknown) as T; // or Number(v) if you're sure it fits
+  if (Array.isArray(v)) return v.map(jsonSafe) as unknown as T;
+  if (v && typeof v === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, val] of Object.entries(v)) out[k] = jsonSafe(val as unknown);
+    return out as T;
+  }
+  return v;
+}
+
+type JobRow = {
+  job_id: bigint;
+  title: string;
+  company: string;
+  location: string;
+  url: string;
+  score: number;
+};
+
 export async function GET(req: NextRequest) {
   const uid = BigInt(new URL(req.url).searchParams.get("userId") || "1");
 
-  // 1) Load the user's resume embedding
   const [row] = await prisma.$queryRaw<{ embedding: unknown }[]>`
     SELECT embedding
     FROM resumes
@@ -14,11 +33,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ jobs: [] });
   }
 
-  // 2) ANN search using TiDB vector function
-  //    Order by distance ASC for index usage; compute a [0..1] similarity score.
-  const jobs = await prisma.$queryRaw<
-    { job_id: bigint; title: string; company: string; location: string; url: string; score: number }[]
-  >`
+  const jobs = await prisma.$queryRaw<JobRow[]>`
     SELECT
       j.job_id,
       j.title,
@@ -33,10 +48,11 @@ export async function GET(req: NextRequest) {
     LIMIT 20
   `;
 
-  return NextResponse.json({
-    jobs: jobs.map((j) => ({
-      ...j,
-      id: Number(j.job_id), // convert BIGINT -> number
-    })),
-  });
+  // remove job_id (bigint) and add string id instead
+  const payload = jobs.map(({ job_id, ...rest }) => ({
+    ...rest,
+    id: String(job_id), // use String to avoid overflow; use Number(...) if safe
+  }));
+
+  return NextResponse.json(jsonSafe({ jobs: payload }));
 }

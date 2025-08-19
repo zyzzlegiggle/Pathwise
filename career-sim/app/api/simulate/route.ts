@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
 
   // dummy: each week add +0.05 to score until max 1.0
   let score = 1 - (await prisma.$queryRawUnsafe<any[]>(`
-    SELECT COSINE_DISTANCE(?, ?) AS d
+    SELECT VEC_COSINE_DISTANCE(?, ?) AS d
   `, u.embedding, j.embedding))[0].d;
 
   const steps = [];
@@ -23,19 +23,29 @@ export async function POST(req: NextRequest) {
   }
 
   // store simulation
-  const sim = await prisma.simulation.create({
-    data: { userId: uid, pathName: "AutoSim", durationWeeks: steps.length }
+    const sim = await prisma.simulation.create({
+    data: {
+      user: { connect: { user_id: BigInt(uid) } }, // user_id must be unique on User
+      path_name: "AutoSim",
+      duration_weeks: steps.length
+    }
   });
   for (const s of steps) {
     await prisma.simulationStep.create({
       data: {
-        simId: sim.id,
+        sim_id: sim.sim_id, 
         week: s.week,
-        addedSkills: JSON.stringify([]),
-        estQualificationScore: s.score
+        added_skills: JSON.stringify([]),
+        est_qualification_score: s.score
       }
     });
+
   }
 
-  return NextResponse.json({ simId: sim.id, steps });
+  console.log(steps);
+
+  return NextResponse.json({ 
+  simId: sim.sim_id.toString(), // convert BigInt → string
+  steps 
+});
 }

@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
 
   const results = await prisma.$queryRawUnsafe<any[]>(`
     SELECT r.title, r.provider, r.url, r.hours_estimate,
-           1 - COSINE_DISTANCE(r.embedding, ?) AS score
+           1 - VEC_COSINE_DISTANCE(r.embedding, ?) AS score
     FROM resources r
     ORDER BY score DESC LIMIT 5
   `, row.embedding);

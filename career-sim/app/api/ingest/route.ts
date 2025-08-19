@@ -13,9 +13,9 @@ export async function POST(req: NextRequest) {
   const vecText = `[${vec.join(",")}]`;                 // e.g. "[0.12,0.34,...]"
 
   // Upsert User (schema: model User { user_id BigInt @id ... })
-  await prisma.user.upsert({
-    where: { user_id: uid },
-    create: { user_id: uid, email: `u${userId}@demo.local` },
+    await prisma.user.upsert({
+    where: { user_id: uid },            // You can still use this for 'where'
+    create: { email: `u${userId}@demo.local` }, // <- omit user_id here
     update: {},
   });
 
