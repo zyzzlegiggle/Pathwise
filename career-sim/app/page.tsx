@@ -25,6 +25,14 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 type JobResult = {
   id: string; // backend returns string; was number before (fix)
@@ -457,20 +465,28 @@ const onRunF = () => {
       <h1 className="text-2xl font-bold">Career Clone Demo</h1>
 
       {/* Agent Orchestrator */}
-      <section className="rounded-xl border p-4 space-y-4">
+      <Dialog>
+        <DialogTrigger asChild>
+          <Button variant="outline">Open Agent Orchestrator</Button>
+        </DialogTrigger>
+        <DialogContent className="max-w-5xl w-[95vw]">
+          <DialogHeader className="flex flex-row items-center justify-between">
+            <DialogTitle>Agent Orchestrator</DialogTitle>
+            <div className="flex gap-2">
+              <Button variant="secondary" onClick={resetAgents}>Reset</Button>
+              <Button onClick={runAll}>Run all (A→F)</Button>
+            </div>
+          </DialogHeader>
+          <ScrollArea className="max-h-[80vh] pr-2">
+              <section className="rounded-xl border p-4 space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold">Agent Orchestrator</h2>
             <p className="text-sm text-muted-foreground">
               Run each agent step-by-step or run the full pipeline.
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="secondary" onClick={resetAgents}>
-              Reset
-            </Button>
-            <Button onClick={runAll}>Run all (A→F)</Button>
-          </div>
+          
+          
         </div>
 
         <div className="grid gap-3">
@@ -554,6 +570,13 @@ const onRunF = () => {
           })}
         </div>
       </section>
+          </ScrollArea>
+          
+
+          
+        </DialogContent>
+      </Dialog>
+      
 
       {/* Resume uploader */}
       <section className="space-y-2">
