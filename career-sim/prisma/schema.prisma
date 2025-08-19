@@ -1,80 +1,152 @@
-// prisma/schema.prisma
 datasource db {
   provider = "mysql"
-  url      = env("DATABASE_URL")     // TiDB connection string
+  url      = env("DATABASE_URL")
 }
+
 generator client {
   provider = "prisma-client-js"
 }
 
 model User {
-  id              BigInt  @id @default(autoincrement())
-  email           String  @unique
-  name            String?
-  country         String?
-  yearsExperience Decimal? @db.Decimal(4,1)
-  createdAt       DateTime @default(now())
-  skills          UserSkill[]
-  resume          Resume?
-  simulations     Simulation[]
+  user_id          BigInt   @id @default(autoincrement())
+  email            String   @unique
+  name             String?
+  country          String?
+  years_experience Decimal? @db.Decimal(4,1)
+  created_at       DateTime @default(now())
+  skills           UserSkill[]
+  resume           Resume?
+  simulations      Simulation[]
+
+  @@map("users")
 }
 
 model UserSkill {
-  userId     BigInt
-  skillName  String
-  proficiency Int    // 1-5
-  years      Decimal? @db.Decimal(4,1)
-  lastUsed   DateTime?
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user_id     BigInt
+  skill_name  String
+  proficiency Int?
+  years       Decimal? @db.Decimal(4,1)
+  last_used   DateTime? @db.Date
 
-  @@id([userId, skillName])
+  user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@id([user_id, skill_name])
+  @@index([skill_name])
+  @@map("user_skills")
 }
 
 model Resume {
-  userId   BigInt  @id
-  rawText  String  @db.LongText 
-  embedding Bytes?
-  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user_id  BigInt @id
+  raw_text String @db.MediumText
+
+  user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@map("resumes")
 }
 
 model Job {
-  id         BigInt   @id @default(autoincrement())
-  source     String
-  externalId String
-  title      String
-  company    String?
-  location   String?
-  minSalary  Int?
-  maxSalary  Int?
-  currency   String?  @default("USD")
-  postDate   DateTime?
-  url        String? @db.LongText
-  text       JobText?
+  job_id      BigInt   @id @default(autoincrement())
+  source      String?
+  external_id String?
+  title       String?
+  company     String?
+  location    String?
+  min_salary  Int?
+  max_salary  Int?
+  currency    String?  @default("USD")
+  post_date   DateTime? @db.Date
+  url         String? @db.Text
+  text        JobText?
+  requirements JobRequirement[]
+  sim_targets  SimTarget[]
+
+  @@unique([source, external_id])
+  @@index([post_date])
+  @@index([title])
+  @@map("jobs")
 }
 
 model JobText {
-  jobId       BigInt  @id
-  description String  @db.LongText 
-  embedding   Unsupported("VECTOR")?
-  job         Job     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  job_id      BigInt @id
+  description String @db.MediumText
+
+  job Job @relation(fields: [job_id], references: [job_id], onDelete: Cascade)
+
+  @@map("job_texts")
+}
+
+model JobRequirement {
+  job_id     BigInt
+  skill_name String
+  importance Int?
+
+  job Job @relation(fields: [job_id], references: [job_id], onDelete: Cascade)
+
+  @@id([job_id, skill_name])
+  @@index([skill_name])
+  @@map("job_requirements")
+}
+
+model SkillCatalog {
+  skill_name String @id
+  category   String?
+  aliases    Json?
+
+  @@map("skills_catalog")
+}
+
+model Resource {
+  resource_id    BigInt   @id @default(autoincrement())
+  title          String?
+  provider       String?
+  url            String?
+  hours_estimate Decimal? @db.Decimal(5,1)
+  cost           Decimal? @db.Decimal(8,2) @default(0)
+  skill_targets  Json?
+  description    String? @db.MediumText
+
+  @@index([provider])
+  @@map("resources")
 }
 
 model Simulation {
-  id            BigInt   @id @default(autoincrement())
-  userId        BigInt
-  pathName      String
-  durationWeeks Int
-  createdAt     DateTime @default(now())
-  steps         SimulationStep[]    @relation("SimulationToSteps")
-  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sim_id         BigInt   @id @default(autoincrement())
+  user_id        BigInt
+  path_name      String?
+  duration_weeks Int?
+  created_at     DateTime @default(now())
+
+  user  User              @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  steps SimulationStep[]
+  targets SimTarget[]
+
+  @@index([user_id])
+  @@map("simulations")
 }
 
 model SimulationStep {
-  simId                 BigInt
-  week                  Int
-  addedSkills           Json
-  estQualificationScore Decimal @db.Decimal(5,2)
-  simulation            Simulation @relation("SimulationToSteps", fields: [simId], references: [id], onDelete: Cascade)
+  sim_id                  BigInt
+  week                    Int
+  added_skills            Json?
+  est_qualification_score Decimal? @db.Decimal(5,2)
 
-  @@id([simId, week])
+  simulation Simulation @relation(fields: [sim_id], references: [sim_id], onDelete: Cascade)
+
+  @@id([sim_id, week])
+  @@map("simulation_steps")
+}
+
+model SimTarget {
+  sim_id     BigInt
+  job_id     BigInt
+  fit_score  Decimal? @db.Decimal(5,2)
+  gap_skills Json?
+  rationale  String? @db.MediumText
+
+  simulation Simulation @relation(fields: [sim_id], references: [sim_id], onDelete: Cascade)
+  job        Job        @relation(fields: [job_id], references: [job_id], onDelete: Cascade)
+
+  @@id([sim_id, job_id])
+  @@index([fit_score])
+  @@map("sim_targets")
 }
