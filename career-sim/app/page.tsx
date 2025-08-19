@@ -100,8 +100,9 @@ function newAgentState(): AgentState {
   };
 }
 
+type Series = { label: string; steps: SimStep[] };
+
 export default function HomePage() {
-  // --------- your existing state ---------
   const [resume, setResume] = useState("");
   const [role, setRole] = useState("software engineer");
   const [location, setLocation] = useState("Singapore");
@@ -117,6 +118,8 @@ export default function HomePage() {
   const [simSteps, setSimSteps] = useState<SimStep[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [explanation, setExplanation] = useState<string>("");
+  const [citedJobIds, setCitedJobIds] = useState<string[]>([]);
+  const [multiSeries, setMultiSeries] = useState<Series[]>([]);
 
   // --------- Agent orchestration state ---------
   const [agents, setAgents] = useState<AgentState>(newAgentState());
@@ -247,152 +250,204 @@ export default function HomePage() {
     }
   }
 
+  function onRunSSE(params: Record<string, string>) {
+    const qs = new URLSearchParams(params).toString();
+    const es = new EventSource(`/api/agents/run?${qs}`);
+    return es;
+  }
+
   // ------------- Agent wrappers -------------
-  const runAgentA = useCallback(async () => {
-    setStatus("A", "running");
-    setProgress("A", 10);
-    appendLog("A", "Starting ingestion…");
-    try {
-      await uploadResume();
-      setProgress("A", 70);
-      appendLog("A", "Resume stored and embedded.");
-      setProgress("A", 100);
-      setStatus("A", "done");
-      appendLog("A", "Agent A finished.");
-    } catch (e: any) {
-      setStatus("A", "error");
-      appendLog("A", `Error: ${e?.message || "unknown error"}`);
-    }
-  }, [appendLog, setProgress, setStatus, resume]);
+  // Agent A
+  const onRunA = () => {
+    setAgents((s) => ({ ...s, A: { ...s.A, status: "running", log: [], progress: 0 } }));
+    const es = onRunSSE({
+      agent: "A",
+      userId: "1",
+      // WARNING: querystrings have length limits; for long resumes, switch to POST streaming in prod.
+      resume: resume.slice(0, 3000),
+    });
+    es.addEventListener("log", (e: any) =>
+      appendLog("A", JSON.parse(e.data).line)
+    );
+    es.addEventListener("progress", (e: any) =>
+      setProgress("A", JSON.parse(e.data).progress)
+    );
+    es.addEventListener("status", (e: any) => {
+      const { status } = JSON.parse(e.data);
+      setStatus("A", status as any);
+      if (status !== "running") es.close();
+    });
+  };
 
-  const runAgentB = useCallback(async () => {
-    setStatus("B", "running");
-    setProgress("B", 10);
-    appendLog("B", "Fetching fresh job postings…");
-    try {
-      await fetchJobs(); // pulls and stores jobs
-      setProgress("B", 60);
-      appendLog("B", "Indexing + embedding…");
-      await findSimilar(); // populates UI with similar jobs
-      setProgress("B", 100);
-      setStatus("B", "done");
-      appendLog("B", `Found ${jobs.length || "…"} similar jobs.`);
-    } catch (e: any) {
-      setStatus("B", "error");
-      appendLog("B", `Error: ${e?.message || "unknown error"}`);
-    }
-  }, [appendLog, setProgress, setStatus, role, location, remoteOnly, jobs.length]);
-
-  const runAgentC = useCallback(async () => {
-    setStatus("C", "running");
-    setProgress("C", 5);
-    appendLog("C", "Selecting top job and computing gaps…");
-    try {
-      const top = jobs[0];
-      if (!top) {
-        throw new Error("No jobs available. Run Agent B first.");
+  // Agent B
+  const onRunB = () => {
+    setAgents((s) => ({ ...s, B: { ...s.B, status: "running", log: [], progress: 0 } }));
+    const es = onRunSSE({
+      agent: "B",
+      userId: "1",
+      role,
+      location,
+      remote: String(remoteOnly),
+    });
+    es.addEventListener("log", (e: any) =>
+      appendLog("B", JSON.parse(e.data).line)
+    );
+    es.addEventListener("progress", (e: any) =>
+      setProgress("B", JSON.parse(e.data).progress)
+    );
+    es.addEventListener("payload", (e: any) => {
+      const p = JSON.parse(e.data);
+      if (p.jobs) {
+        setJobs(p.jobs);
+        // initialize selector + citations
+        const id = p.jobs[0]?.id;
+        if (id) {
+          setSelectedJobId(id);
+          setCitedJobIds(Array.from(new Set([id, ...p.jobs.slice(0, 3).map((j: any) => j.id)])));
+        }
       }
-      await analyzeGaps(top.id);
-      setProgress("C", 100);
-      setStatus("C", "done");
-      appendLog("C", `Gaps ready for job #${top.id}.`);
-    } catch (e: any) {
-      setStatus("C", "error");
-      appendLog("C", `Error: ${e?.message || "unknown error"}`);
-    }
-  }, [appendLog, setProgress, setStatus, jobs]);
+    });
+    es.addEventListener("status", (e: any) => {
+      const { status } = JSON.parse(e.data);
+      setStatus("B", status as any);
+      if (status !== "running") es.close();
+    });
+  };
 
-  const runAgentD = useCallback(async () => {
-    setStatus("D", "running");
-    setProgress("D", 5);
-    appendLog("D", "Fetching learning resources per gap…");
-    try {
-      const top = jobs[0];
-      if (!top) throw new Error("No jobs available. Run Agent B first.");
-      const gaps = gapsByJob[top.id] ?? [];
-      if (gaps.length === 0) {
-        appendLog("D", "No gaps found (or Agent C hasn’t run).");
-        setProgress("D", 100);
-        setStatus("D", "done");
-        return;
-      }
-      const per = Math.max(90 / gaps.length, 10);
-      for (let i = 0; i < gaps.length; i++) {
-        const g = gaps[i];
-        appendLog("D", `→ ${g}`);
-        await fetchResources(g);
-        setProgress("D", Math.min(10 + per * (i + 1), 100));
-      }
-      setProgress("D", 100);
-      setStatus("D", "done");
-      appendLog("D", "Curriculum assembled.");
-    } catch (e: any) {
-      setStatus("D", "error");
-      appendLog("D", `Error: ${e?.message || "unknown error"}`);
-    }
-  }, [appendLog, setProgress, setStatus, jobs, gapsByJob]);
+  // Agent C
+  const onRunC = () => {
+    const jid = selectedJobId || jobs[0]?.id;
+    if (!jid) return;
+    setAgents((s) => ({ ...s, C: { ...s.C, status: "running", log: [], progress: 0 } }));
+    const es = onRunSSE({ agent: "C", userId: "1", jobId: jid });
+    es.addEventListener("log", (e: any) => appendLog("C", JSON.parse(e.data).line));
+    es.addEventListener("progress", (e: any) =>
+      setProgress("C", JSON.parse(e.data).progress)
+    );
+    es.addEventListener("payload", (e: any) => {
+      const { gaps } = JSON.parse(e.data);
+      setGapsByJob((prev) => ({ ...prev, [jid]: gaps || [] }));
+    });
+    es.addEventListener("status", (e: any) => {
+      const { status } = JSON.parse(e.data);
+      setStatus("C", status as any);
+    if (status !== "running") es.close();
+  });
+};
 
-  const runAgentE = useCallback(async () => {
-    setStatus("E", "running");
-    setProgress("E", 10);
-    appendLog("E", "Simulating 12-week path…");
-    try {
-      const top = jobs[0];
-      if (!top) throw new Error("No jobs available. Run Agent B first.");
-      await simulate(top.id);
-      setProgress("E", 100);
-      setStatus("E", "done");
-      appendLog("E", "Simulation complete.");
-    } catch (e: any) {
-      setStatus("E", "error");
-      appendLog("E", `Error: ${e?.message || "unknown error"}`);
-    }
-  }, [appendLog, setProgress, setStatus, jobs]);
+// Agent D
+const onRunD = () => {
+  const jid = selectedJobId || jobs[0]?.id;
+  const skills = (gapsByJob[jid] || []).join(",");
+  setAgents((s) => ({ ...s, D: { ...s.D, status: "running", log: [], progress: 0 } }));
+  const es = onRunSSE({ agent: "D", userId: "1", skills });
+  es.addEventListener("log", (e: any) => appendLog("D", JSON.parse(e.data).line));
+  es.addEventListener("progress", (e: any) =>
+    setProgress("D", JSON.parse(e.data).progress)
+  );
+  es.addEventListener("payload", (e: any) => {
+    const { resources } = JSON.parse(e.data);
+    setResourcesBySkill((prev) => ({ ...prev, ...resources }));
+  });
+  es.addEventListener("status", (e: any) => {
+    const { status } = JSON.parse(e.data);
+    setStatus("D", status as any);
+    if (status !== "running") es.close();
+  });
+};
 
-  const runAgentF = useCallback(async () => {
-    setStatus("F", "running");
-    setProgress("F", 25);
-    appendLog("F", "Generating explainable summary…");
-    try {
-      const top = jobs[0];
-      const gaps = top ? gapsByJob[top.id] ?? [] : [];
-      const citedJobs = jobs.slice(0, 3);
-      const summary = [
+// Agent E — multi-path (8/10/15 h/week overlay)
+const onRunE = () => {
+  const jid = selectedJobId || jobs[0]?.id;
+  if (!jid) return;
+  setAgents((s) => ({ ...s, E: { ...s.E, status: "running", log: [], progress: 0 } }));
+  setMultiSeries([]); // reset
+  const es = onRunSSE({
+    agent: "E",
+    userId: "1",
+    jobId: jid,
+    variants: "8,10,15",
+  });
+  es.addEventListener("log", (e: any) => appendLog("E", JSON.parse(e.data).line));
+  es.addEventListener("progress", (e: any) =>
+    setProgress("E", JSON.parse(e.data).progress)
+  );
+  es.addEventListener("payload", (e: any) => {
+    const { series } = JSON.parse(e.data);
+    setMultiSeries(series || []);
+    // also keep single-series backward compat
+    
+    const base = series?.find((s: any) => s.label === "10h/wk") || series?.[0];
+    if (base) setSimSteps(base.steps);
+  });
+  es.addEventListener("status", (e: any) => {
+    const { status } = JSON.parse(e.data);
+    setStatus("E", status as any);
+    if (status !== "running") es.close();
+  });
+};
+
+// Agent F — pass citations
+const onRunF = () => {
+  setAgents((s) => ({ ...s, F: { ...s.F, status: "running", log: [], progress: 0 } }));
+  const es = onRunSSE({
+    agent: "F",
+    userId: "1",
+    citedJobs: citedJobIds.join(","),
+  });
+  es.addEventListener("log", (e: any) => appendLog("F", JSON.parse(e.data).line));
+  es.addEventListener("progress", (e: any) =>
+    setProgress("F", JSON.parse(e.data).progress)
+  );
+  es.addEventListener("payload", (e: any) => {
+    const { citedJobs } = JSON.parse(e.data);
+    // build a short explanation that cites titles/urls from current jobs list
+    const lookup = new Map(jobs.map((j) => [j.id, j]));
+    const picked = citedJobs
+      .map((id: string, i: number) => {
+        const j = lookup.get(id);
+        return j ? `[${i + 1}] ${j.title} — ${j.url || "N/A"}` : null;
+      })
+      .filter(Boolean)
+      .join("\n");
+    const top = jobs.find((j) => j.id === (selectedJobId || jobs[0]?.id));
+    const gaps = top ? (gapsByJob[top.id] || []) : [];
+    const summary =
+      [
         `Top target: ${top ? `${top.title} @ ${top.company} (${top.location})` : "N/A"}`,
         top ? `Current match score: ${(top.score * 100).toFixed(1)}%` : "",
         gaps.length ? `Primary gaps: ${gaps.join(", ")}` : "No significant gaps detected.",
-        simSteps.length
-          ? `Projected qualification in 12 weeks: ${
-              simSteps[simSteps.length - 1].score
-            }%`
+        multiSeries.length
+          ? `Projected qualification after 12 weeks: ${multiSeries
+              .map((s) => `${s.label} → ${s.steps.at(-1)?.score ?? "—"}%`)
+              .join(" | ")}`
+          : simSteps.length
+          ? `Projected qualification in 12 weeks: ${simSteps.at(-1)?.score ?? "—"}%`
           : "No simulation data yet.",
-        citedJobs.length
-          ? `Citations:\n${citedJobs
-              .map((j, i) => `  [${i + 1}] ${j.title} — ${j.url || "N/A"}`)
-              .join("\n")}`
-          : "",
+        picked ? `Citations:\n${picked}` : "",
       ]
         .filter(Boolean)
         .join("\n");
-      setExplanation(summary);
-      setProgress("F", 100);
-      setStatus("F", "done");
-      appendLog("F", "Report generated.");
-    } catch (e: any) {
-      setStatus("F", "error");
-      appendLog("F", `Error: ${e?.message || "unknown error"}`);
-    }
-  }, [appendLog, setProgress, setStatus, jobs, gapsByJob, simSteps]);
+    setExplanation(summary);
+  });
+  es.addEventListener("status", (e: any) => {
+    const { status } = JSON.parse(e.data);
+    setStatus("F", status as any);
+    if (status !== "running") es.close();
+  });
+};
 
-  const runAll = useCallback(async () => {
-    resetAgents();
-    await runAgentA();
-    await runAgentB();
-    await runAgentC();
-    await runAgentD();
-    await runAgentE();
-    await runAgentF();
-  }, [runAgentA, runAgentB, runAgentC, runAgentD, runAgentE, runAgentF]);
+
+  const runAll = async () => {
+  // run sequentially to keep UX simple
+  onRunA();
+  // wait a bit for A to finish before starting B (quick heuristic for demo)
+  setTimeout(() => onRunB(), 400);
+  setTimeout(() => onRunC(), 1200);
+  setTimeout(() => onRunD(), 1800);
+  setTimeout(() => onRunE(), 2400);
+  setTimeout(() => onRunF(), 3200);
+};
 
   // derived
   const topJob = useMemo(() => jobs[0], [jobs]);
@@ -449,16 +504,16 @@ export default function HomePage() {
                       variant="outline"
                       onClick={
                         a.key === "A"
-                          ? runAgentA
+                          ? onRunA
                           : a.key === "B"
-                          ? runAgentB
+                          ? onRunB
                           : a.key === "C"
-                          ? runAgentC
+                          ? onRunC
                           : a.key === "D"
-                          ? runAgentD
+                          ? onRunD
                           : a.key === "E"
-                          ? runAgentE
-                          : runAgentF
+                          ? onRunE
+                          : onRunF
                       }
                     >
                       Run this agent
@@ -555,6 +610,31 @@ export default function HomePage() {
       </div>
 
       {message && <p className="text-gray-700">{message}</p>}
+
+      {jobs.length > 0 && (
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium">Target job for C–F</label>
+          <select
+            className="border rounded-md px-2 py-1 text-sm"
+            value={selectedJobId ?? jobs[0]?.id}
+            onChange={(e) => {
+              const id = e.target.value;
+              setSelectedJobId(id);
+              // keep 3 most-relevant job ids for potential citations
+              const top3 = jobs.slice(0, 3).map((j) => j.id);
+              // ensure selected is included
+              const citations = Array.from(new Set([id, ...top3])).slice(0, 5);
+              setCitedJobIds(citations);
+            }}
+          >
+            {jobs.map((j) => (
+              <option key={j.id} value={j.id}>
+                {j.title} @ {j.company} — {(j.score * 100).toFixed(1)}%
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Job results */}
       <div className="grid gap-4 mt-6">
@@ -658,8 +738,8 @@ export default function HomePage() {
         ))}
       </div>
 
-      {/* simulation chart */}
-      {simSteps.length > 0 && (
+      {/* simulation chart with multi-path overlay */}
+      {(multiSeries.length > 0 || simSteps.length > 0) && (
         <section className="mt-10">
           <h2 className="text-lg font-semibold mb-2">
             Simulation — Qualification vs Weeks{" "}
@@ -667,15 +747,38 @@ export default function HomePage() {
           </h2>
           <div className="w-full h-64 rounded-lg border p-3">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={simSteps}>
+              <LineChart
+                data={
+                  // merge data by week for tooltip alignment (uses the longest series)
+                  (multiSeries[0]?.steps || simSteps).map((row, idx) => {
+                    const base = { week: row.week, base: row.score };
+                    multiSeries.forEach((s, si) => {
+                      base.base = s.steps[idx]?.score ?? null;
+                    });
+                    return base;
+                  })
+                }
+              >
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="week" />
                 <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
                 <Tooltip
-                  formatter={(val: any) => `${val}%`}
+                  formatter={(val: any) => (val == null ? "—" : `${val}%`)}
                   labelFormatter={(l) => `Week ${l}`}
                 />
-                <Line type="monotone" dataKey="score" dot />
+                {multiSeries.length > 0
+                  ? multiSeries.map((s, i) => (
+                      <Line
+                        key={s.label}
+                        type="monotone"
+                        dataKey={`s${i}`}
+                        name={s.label}
+                        dot
+                      />
+                    ))
+                  : (
+                      <Line type="monotone" dataKey="base" name="10h/wk" dot />
+                    )}
               </LineChart>
             </ResponsiveContainer>
           </div>
