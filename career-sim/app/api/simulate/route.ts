@@ -11,16 +11,86 @@ export async function POST(req: NextRequest) {
   const [j] = await prisma.$queryRawUnsafe<any[]>(`SELECT embedding FROM job_texts WHERE job_id=?`, jid.toString());
   if (!u?.embedding || !j?.embedding) return NextResponse.json({ error: "Missing embeddings" }, { status: 400 });
 
-  // dummy: each week add +0.05 to score until max 1.0
-  let score = 1 - (await prisma.$queryRawUnsafe<any[]>(`
-    SELECT VEC_COSINE_DISTANCE(?, ?) AS d
-  `, u.embedding, j.embedding))[0].d;
 
-  const steps = [];
-  for (let week = 1; week <= 12; week++) {
-    score = Math.min(score + 0.05, 1.0);
-    steps.push({ week, score: Number((score * 100).toFixed(1)) });
+  // 1) find mentioned-but-missing skills (same logic as /api/gaps)
+const userSkills = await prisma.userSkill.findMany({
+  where: { user_id: uid },
+  select: { skill_name: true },
+});
+const userSkillNames = new Set(userSkills.map((s) => s.skill_name.toLowerCase()));
+
+const jtFull = await prisma.jobText.findUnique({
+  where: { job_id: jid },
+  select: { description: true },
+});
+const jobDesc = (jtFull?.description ?? "").toLowerCase();
+
+const catalog = await prisma.skillCatalog.findMany({
+  select: { skill_name: true, aliases: true },
+});
+
+const missingSkills: string[] = [];
+for (const s of catalog) {
+  const aliases: string[] = Array.isArray(s.aliases) ? (s.aliases as any) : [];
+  const names = [s.skill_name, ...aliases]
+    .filter((x): x is string => typeof x === "string")
+    .map((x) => x.toLowerCase());
+
+  const userHas = names.some((n) => userSkillNames.has(n));
+  const mentioned = names.some((n) => jobDesc.includes(n));
+  if (!userHas && mentioned) missingSkills.push(s.skill_name);
+}
+
+// 2) pull resources + rough hours
+type GapItem = { skill: string; hours: number; remaining: number };
+const gaps: GapItem[] = [];
+for (const skill of missingSkills) {
+  const [skillRow] = await prisma.$queryRawUnsafe<any[]>(
+    "SELECT embedding FROM skills_catalog WHERE skill_name = ?",
+    skill
+  );
+  if (!skillRow?.embedding) continue;
+
+  const resources = await prisma.$queryRawUnsafe<any[]>(
+    `SELECT r.title, r.provider, r.url, COALESCE(r.hours_estimate, 8) AS hours_estimate,
+            1 - VEC_COSINE_DISTANCE(r.embedding, ?) AS score
+     FROM resources r
+     ORDER BY score DESC
+     LIMIT 3`,
+    skillRow.embedding
+  );
+  const totalHours = resources.reduce((a: number, r: any) => a + (Number(r.hours_estimate) || 8), 0);
+  if (totalHours > 0) gaps.push({ skill, hours: totalHours, remaining: totalHours });
+}
+
+// 3) simulate weekly progress consuming hours
+const weeks = 12;
+const perSkillBump = gaps.length > 0 ? 0.6 / gaps.length : 0; // gaps close contributes up to +0.6
+let steps: { week: number; score: number }[] = [];
+// base score from cosine similarity
+const [{ d }] = await prisma.$queryRawUnsafe<any[]>(
+  "SELECT VEC_COSINE_DISTANCE(?, ?) AS d",
+  u.embedding,
+  j.embedding
+);
+let runningScore = Math.max(0, Math.min(1, 1 - d)); // base similarity 0..1
+
+for (let week = 1; week <= weeks; week++) {
+  let capacity = weeklyHours;
+  // greedy consume hours across remaining skills
+  for (const g of gaps) {
+    if (capacity <= 0) break;
+    if (g.remaining <= 0) continue;
+    const consume = Math.min(g.remaining, capacity);
+    g.remaining -= consume;
+    capacity -= consume;
+    if (g.remaining <= 0) {
+      runningScore += perSkillBump; // finished a skill -> bump
+    }
   }
+  runningScore = Math.min(runningScore + 0.02, 1.0); // small ambient gain from “practice”
+  steps.push({ week, score: Number((Math.min(runningScore, 1) * 100).toFixed(1)) });
+}
 
   // store simulation
     const sim = await prisma.simulation.create({
