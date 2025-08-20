@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
 export async function POST(req: NextRequest) {
-  const { userId, jobId, weeklyHours = 10 } = await req.json();
-  const uid = BigInt(userId);
+  const { userId, jobId, weeklyHours = 10, weeks: weeksOverride } = await req.json();  const uid = BigInt(userId);
   const jid = BigInt(jobId);
 
   // get user & job vectors
@@ -64,7 +63,7 @@ for (const skill of missingSkills) {
 }
 
 // 3) simulate weekly progress consuming hours
-const weeks = 12;
+const weeks = Math.max(4, Math.min(52, Number(weeksOverride ?? 12)));
 const perSkillBump = gaps.length > 0 ? 0.6 / gaps.length : 0; // gaps close contributes up to +0.6
 let steps: { week: number; score: number }[] = [];
 // base score from cosine similarity

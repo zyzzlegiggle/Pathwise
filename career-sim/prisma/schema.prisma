@@ -17,6 +17,7 @@ model User {
   skills           UserSkill[]
   resume           Resume?
   simulations      Simulation[]
+  goal             UserGoal?
 
   @@map("users")
 }
@@ -150,3 +151,19 @@ model SimTarget {
   @@index([fit_score])
   @@map("sim_targets")
 }
+
+model UserGoal {
+  user_id              BigInt   @id
+  target_role          String
+  timeframe_min_months Int
+  timeframe_max_months Int
+  stack_prefs          Json
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
+
+  // 1–1 relation to User via user_id
+  user User @relation(fields: [user_id], references: [user_id])
+
+  @@map("user_goal")
+}
+

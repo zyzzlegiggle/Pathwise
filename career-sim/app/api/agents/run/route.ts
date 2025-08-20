@@ -39,7 +39,9 @@ export async function GET(req: NextRequest) {
   const remote = searchParams.get("remote") === "true";
   const jobId = searchParams.get("jobId");
   const resume = searchParams.get("resume") || ""; // NOTE: keep short; prefer POST for long resumes in prod.
-
+  const timeframeMin = Number(searchParams.get("timeframeMin") || "6");
+  const timeframeMax = Number(searchParams.get("timeframeMax") || "9");
+  const stackPrefs = (searchParams.get("stackPrefs") || "").split(",").filter(Boolean);
   const origin = req.nextUrl.origin;
 
   return sse(async (send) => {
@@ -80,9 +82,9 @@ export async function GET(req: NextRequest) {
         break;
       }
       case "C": {
-        if (!jobId) throw new Error("Missing jobId for Agent C.");
-        step(20);
-        send("log", { line: `Analyzing gaps for job ${jobId}…` });
+         if (!jobId) throw new Error("Missing jobId for Agent C.");
+          step(15);
+          send("log", { line: `Goals: ${timeframeMin}-${timeframeMax} mo; stacks=${stackPrefs.join("/") || "any"}` });
         const r = await fetch(`${origin}/api/gaps?userId=${userId}&jobId=${jobId}`);
         const j = await r.json();
         step(100);
@@ -91,12 +93,18 @@ export async function GET(req: NextRequest) {
         break;
       }
       case "D": {
-        const skills = (searchParams.get("skills") || "").split(",").filter(Boolean);
+         let skills = (searchParams.get("skills") || "").split(",").filter(Boolean);
+  
         if (!skills.length) {
           send("log", { line: "No gaps provided; nothing to fetch." });
           step(100);
           send("payload", { resources: {} });
           break;
+        }
+        if (stackPrefs.length) {
+          const kw = stackPrefs.map((s) => s.toLowerCase());
+          skills = skills.filter((g) => kw.some((k) => g.toLowerCase().includes(k)));
+          send("log", { line: `Filtered gaps by stacks → ${skills.length} skills.` });
         }
         const resources: Record<string, any[]> = {};
         let i = 0;
@@ -114,20 +122,19 @@ export async function GET(req: NextRequest) {
       }
       case "E": {
         if (!jobId) throw new Error("Missing jobId for Agent E.");
-        // Multi-path demo: vary weeklyHours to simulate alternative paces/paths
+        const avgMonths = (timeframeMin + timeframeMax) / 2;
+        const weeksTarget = Math.round(avgMonths * 4.3); // approx weeks/month
         const variants = (searchParams.get("variants") || "8,10,15")
-          .split(",")
-          .map((v) => Number(v.trim()))
-          .filter((n) => !Number.isNaN(n));
+          .split(",").map((v) => Number(v.trim())).filter((n) => !Number.isNaN(n));
 
         const series: { label: string; steps: any[] }[] = [];
         let idx = 0;
         for (const hours of variants) {
-          send("log", { line: `Simulating path @ ${hours}h/week…` });
+          send("log", { line: `Simulating ${weeksTarget} weeks @ ${hours}h/week…` });
           const r = await fetch(`${origin}/api/simulate`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ userId, jobId, weeklyHours: hours }),
+            body: JSON.stringify({ userId, jobId, weeklyHours: hours, weeks: weeksTarget }),
           });
           const j = await r.json();
           series.push({ label: `${hours}h/wk`, steps: j.steps || [] });
@@ -139,6 +146,7 @@ export async function GET(req: NextRequest) {
         send("log", { line: "Simulation complete for all variants." });
         break;
       }
+
       case "F": {
         // Expect citedJobs param as comma-separated job IDs chosen by the client
         const citedJobs = (searchParams.get("citedJobs") || "").split(",").filter(Boolean);

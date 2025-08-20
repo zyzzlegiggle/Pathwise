@@ -128,6 +128,10 @@ export default function HomePage() {
   const [explanation, setExplanation] = useState<string>("");
   const [citedJobIds, setCitedJobIds] = useState<string[]>([]);
   const [multiSeries, setMultiSeries] = useState<Series[]>([]);
+  const [goalRole, setGoalRole] = useState("backend SWE");
+  const [goalMonths, setGoalMonths] = useState<[number, number]>([6, 9]);
+  const [stackPrefs, setStackPrefs] = useState<string[]>([]); // e.g., ["Rust","Go","Java"]
+
 
   // --------- Agent orchestration state ---------
   const [agents, setAgents] = useState<AgentState>(newAgentState());
@@ -264,6 +268,21 @@ export default function HomePage() {
     return es;
   }
 
+    async function saveGoals() {
+    await fetch("/api/goals", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: "1",
+        targetRole: goalRole,
+        timeframeMin: goalMonths[0],
+        timeframeMax: goalMonths[1],
+        stackPrefs,
+      }),
+    });
+  }
+
+
   // ------------- Agent wrappers -------------
   // Agent A
   const onRunA = () => {
@@ -327,7 +346,12 @@ export default function HomePage() {
     const jid = selectedJobId || jobs[0]?.id;
     if (!jid) return;
     setAgents((s) => ({ ...s, C: { ...s.C, status: "running", log: [], progress: 0 } }));
-    const es = onRunSSE({ agent: "C", userId: "1", jobId: jid });
+    const es = onRunSSE({  agent: "C",
+            userId: "1",
+            jobId: jid,
+            timeframeMin: String(goalMonths[0]),
+            timeframeMax: String(goalMonths[1]),
+            stackPrefs: stackPrefs.join(","),});
     es.addEventListener("log", (e: any) => appendLog("C", JSON.parse(e.data).line));
     es.addEventListener("progress", (e: any) =>
       setProgress("C", JSON.parse(e.data).progress)
@@ -348,7 +372,13 @@ const onRunD = () => {
   const jid = selectedJobId || jobs[0]?.id;
   const skills = (gapsByJob[jid] || []).join(",");
   setAgents((s) => ({ ...s, D: { ...s.D, status: "running", log: [], progress: 0 } }));
-  const es = onRunSSE({ agent: "D", userId: "1", skills });
+  const es = onRunSSE({  agent: "D",
+  userId: "1",
+  skills,
+  timeframeMin: String(goalMonths[0]),
+  timeframeMax: String(goalMonths[1]),
+  stackPrefs: stackPrefs.join(","),
+ });
   es.addEventListener("log", (e: any) => appendLog("D", JSON.parse(e.data).line));
   es.addEventListener("progress", (e: any) =>
     setProgress("D", JSON.parse(e.data).progress)
@@ -372,9 +402,12 @@ const onRunE = () => {
   setMultiSeries([]); // reset
   const es = onRunSSE({
     agent: "E",
-    userId: "1",
-    jobId: jid,
-    variants: "8,10,15",
+  userId: "1",
+  jobId: jid,
+  variants: "8,10,15",
+  timeframeMin: String(goalMonths[0]),
+  timeframeMax: String(goalMonths[1]),
+  stackPrefs: stackPrefs.join(","),
   });
   es.addEventListener("log", (e: any) => appendLog("E", JSON.parse(e.data).line));
   es.addEventListener("progress", (e: any) =>
@@ -463,6 +496,62 @@ const onRunF = () => {
   return (
     <main className="p-8 max-w-4xl mx-auto space-y-6">
       <h1 className="text-2xl font-bold">Career Clone Demo</h1>
+      {/* Goals form */}
+      <section className="rounded-xl border p-4 space-y-3 mb-3">
+        <h3 className="text-sm font-semibold">Pick Goals</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
+          <Input
+            value={goalRole}
+            onChange={(e) => setGoalRole(e.target.value)}
+            placeholder="Target role (e.g., backend SWE)"
+          />
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              min={1}
+              value={goalMonths[0]}
+              onChange={(e) => setGoalMonths([Number(e.target.value), goalMonths[1]])}
+              placeholder="Min months"
+               className="w-24"
+            />
+            <span className="text-sm text-muted-foreground">to</span>
+            <Input
+              type="number"
+              min={goalMonths[0]}
+              value={goalMonths[1]}
+              onChange={(e) => setGoalMonths([goalMonths[0], Number(e.target.value)])}
+              placeholder="Max months"
+               className="w-24"
+            />
+            <span className="text-sm">months</span>
+          </div>
+
+          <div className="flex flex-wrap gap-2 sm:col-span-2">
+            {["Rust","Go","Java","Python","LLM apps","Data Eng","MLOps"].map((t) => {
+              const on = stackPrefs.includes(t);
+              return (
+                <Button
+                  key={t}
+                  type="button"
+                  size="sm"
+                  variant={on ? "default" : "outline"}
+                  onClick={() =>
+                    setStackPrefs((prev) => (on ? prev.filter((x) => x !== t) : [...prev, t]))
+                  }
+                >
+                  {t}
+                </Button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="flex gap-2 justify-end mt-2">
+          <Button variant="secondary" onClick={saveGoals}>Save goals</Button>
+          {/* Optional: run all with current goals */}
+          <Button onClick={runAll}>Run all (A→F) with goals</Button>
+        </div>
+      </section>
 
       {/* Agent Orchestrator */}
       <Dialog>
