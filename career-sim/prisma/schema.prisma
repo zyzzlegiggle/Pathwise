@@ -18,6 +18,7 @@ model User {
   resume           Resume?
   simulations      Simulation[]
   goal             UserGoal?
+  learningPaths    LearningPath[]
 
   @@map("users")
 }
@@ -167,3 +168,25 @@ model UserGoal {
   @@map("user_goal")
 }
 
+
+model LearningPath {
+  path_id    BigInt   @id @default(autoincrement())
+  user_id    BigInt
+  job_id     BigInt
+  name       String
+  skills     Json      // ["Rust","Tokio","Async Rust", ...]
+  created_at DateTime  @default(now())
+
+  user User @relation(fields: [user_id], references: [user_id])
+
+  @@map("learning_path")
+}
+
+model LearningPathRun { // optional: store chosen paths per run
+  run_id     BigInt   @id @default(autoincrement())
+  path_id    BigInt
+  weekly_hours Int
+  created_at DateTime @default(now())
+
+  @@map("learning_path_run")
+}

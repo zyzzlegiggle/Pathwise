@@ -131,7 +131,8 @@ export default function HomePage() {
   const [goalRole, setGoalRole] = useState("backend SWE");
   const [goalMonths, setGoalMonths] = useState<[number, number]>([6, 9]);
   const [stackPrefs, setStackPrefs] = useState<string[]>([]); // e.g., ["Rust","Go","Java"]
-
+  const [paths, setPaths] = useState<{ pathId: string; name: string; skills: string[] }[]>([]);
+  const [selectedPathIds, setSelectedPathIds] = useState<string[]>([]);
 
   // --------- Agent orchestration state ---------
   const [agents, setAgents] = useState<AgentState>(newAgentState());
@@ -384,8 +385,12 @@ const onRunD = () => {
     setProgress("D", JSON.parse(e.data).progress)
   );
   es.addEventListener("payload", (e: any) => {
-    const { resources } = JSON.parse(e.data);
+    const { resources, paths: p } = JSON.parse(e.data);
     setResourcesBySkill((prev) => ({ ...prev, ...resources }));
+    if (p) {
+      setPaths(p);
+      setSelectedPathIds(p.slice(0, 2).map((x: any) => x.pathId)); // preselect top 2
+    }
   });
   es.addEventListener("status", (e: any) => {
     const { status } = JSON.parse(e.data);
@@ -408,6 +413,7 @@ const onRunE = () => {
   timeframeMin: String(goalMonths[0]),
   timeframeMax: String(goalMonths[1]),
   stackPrefs: stackPrefs.join(","),
+  pathIds: selectedPathIds.join(",")
   });
   es.addEventListener("log", (e: any) => appendLog("E", JSON.parse(e.data).line));
   es.addEventListener("progress", (e: any) =>
@@ -650,6 +656,34 @@ const onRunF = () => {
                         "—"}
                     </div>
                   )}
+                  {a.key === "D" && paths.length > 0 && (
+                    <div className="text-xs space-y-2">
+                      <div className="font-semibold">Paths</div>
+                      <div className="flex flex-wrap gap-2">
+                        {paths.map((p) => {
+                          const on = selectedPathIds.includes(p.pathId);
+                          return (
+                            <Button
+                              key={p.pathId}
+                              size="sm"
+                              variant={on ? "default" : "outline"}
+                              onClick={() =>
+                                setSelectedPathIds((prev) =>
+                                  on ? prev.filter((id) => id !== p.pathId) : [...prev, p.pathId]
+                                )
+                              }
+                            >
+                              {p.name}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                      <div className="text-muted-foreground">
+                        Tip: select 1–3 paths, then run Agent E.
+                      </div>
+                    </div>
+                  )}
+
                   {a.key === "F" && explanation && (
                     <pre className="text-xs whitespace-pre-wrap">{explanation}</pre>
                   )}

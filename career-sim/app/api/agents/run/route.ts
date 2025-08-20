@@ -42,7 +42,9 @@ export async function GET(req: NextRequest) {
   const timeframeMin = Number(searchParams.get("timeframeMin") || "6");
   const timeframeMax = Number(searchParams.get("timeframeMax") || "9");
   const stackPrefs = (searchParams.get("stackPrefs") || "").split(",").filter(Boolean);
+  const useLLM = searchParams.get("useLLM") === "true";
   const origin = req.nextUrl.origin;
+  
 
   return sse(async (send) => {
     send("status", { status: "running" });
@@ -115,8 +117,23 @@ export async function GET(req: NextRequest) {
           i++;
           step(20 + Math.round((i / skills.length) * 75));
         }
-        step(100);
+        
+
+        
+        // CREATE PATHS
+        send("log", { line: `Creating learning paths (templates${useLLM ? " + LLM" : ""})…` });
+        const pr = await fetch(`${origin}/api/paths`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId, jobId: searchParams.get("jobId"), //targetRole, // targetRole optional param you may add
+            stackPrefs, gaps: skills, useLLM
+          }),
+        });
+        const pj = await pr.json();
+        send("payload", { paths: pj.paths || [] });
         send("payload", { resources });
+        step(100);
         send("log", { line: "Curriculum assembled." });
         break;
       }
@@ -128,18 +145,23 @@ export async function GET(req: NextRequest) {
           .split(",").map((v) => Number(v.trim())).filter((n) => !Number.isNaN(n));
 
         const series: { label: string; steps: any[] }[] = [];
+        const pathIds = (searchParams.get("pathIds") || "").split(",").filter(Boolean);
+        if (!pathIds.length) send("log", { line: "No pathIds provided — simulating generic path." });
+        const pathLoop = pathIds.length ? pathIds : ["" /* generic */];
         let idx = 0;
-        for (const hours of variants) {
+        for (const pid of pathLoop) {
+          const labelPrefix = pid ? `Path ${pid}` : "Generic";
+          for (const hours of variants) {
           send("log", { line: `Simulating ${weeksTarget} weeks @ ${hours}h/week…` });
           const r = await fetch(`${origin}/api/simulate`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ userId, jobId, weeklyHours: hours, weeks: weeksTarget }),
+            body: JSON.stringify({ userId, jobId, weeklyHours: hours, weeks: weeksTarget, pathId: pid || undefined }),
           });
           const j = await r.json();
-          series.push({ label: `${hours}h/wk`, steps: j.steps || [] });
+          series.push({ label: `${labelPrefix} • ${hours}h/wk`, steps: j.steps || [] });          
           idx++;
-          step(Math.min(15 + Math.round((idx / variants.length) * 80), 99));
+          step(Math.min(15 + Math.round((idx / Math.max(1, pathLoop.length * variants.length)) * 80), 99));        }
         }
         step(100);
         send("payload", { series });

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
 export async function POST(req: NextRequest) {
-  const { userId, jobId, weeklyHours = 10, weeks: weeksOverride } = await req.json();  const uid = BigInt(userId);
+  const { userId, jobId, weeklyHours = 10, weeks: weeksOverride, pathId } = await req.json();
+   const uid = BigInt(userId);
   const jid = BigInt(jobId);
 
   // get user & job vectors
@@ -40,10 +41,26 @@ for (const s of catalog) {
   if (!userHas && mentioned) missingSkills.push(s.skill_name);
 }
 
+// AFTER you compute missingSkills[] (current logic), filter by path if provided
+let targetMissing = missingSkills;
+ if (pathId) {
+   const path = await prisma.learningPath.findUnique({
+     where: { path_id: BigInt(pathId) },
+     select: { skills: true },
+   });
+   const wanted = new Set<string>((path?.skills as string[]) || []);
+   if (wanted.size) {
+     targetMissing = missingSkills.filter((s) =>
+       Array.from(wanted).some((w) => s.toLowerCase().includes(w.toLowerCase()))
+     );
+   }
+ }
+
+
 // 2) pull resources + rough hours
 type GapItem = { skill: string; hours: number; remaining: number };
 const gaps: GapItem[] = [];
-for (const skill of missingSkills) {
+for (const skill of targetMissing) {
   const [skillRow] = await prisma.$queryRawUnsafe<any[]>(
     "SELECT embedding FROM skills_catalog WHERE skill_name = ?",
     skill
@@ -64,7 +81,7 @@ for (const skill of missingSkills) {
 
 // 3) simulate weekly progress consuming hours
 const weeks = Math.max(4, Math.min(52, Number(weeksOverride ?? 12)));
-const perSkillBump = gaps.length > 0 ? 0.6 / gaps.length : 0; // gaps close contributes up to +0.6
+const perSkillBump = gaps.length > 0 ? 0.6 / gaps.length : 0;
 let steps: { week: number; score: number }[] = [];
 // base score from cosine similarity
 const [{ d }] = await prisma.$queryRawUnsafe<any[]>(
