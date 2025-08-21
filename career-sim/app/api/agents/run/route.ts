@@ -90,7 +90,11 @@ export async function GET(req: NextRequest) {
         const r = await fetch(`${origin}/api/gaps?userId=${userId}&jobId=${jobId}`);
         const j = await r.json();
         step(100);
-        send("payload", { gaps: j.missing || [] });
+        send("payload", { 
+          gaps: j.missing || [],
+          cluster: j.cluster || null,
+          coverage: j.coverage || [],
+        });
         send("log", { line: `Detected ${j.missing?.length ?? 0} missing skills.` });
         break;
       }

@@ -133,11 +133,11 @@ export default function HomePage() {
   const [stackPrefs, setStackPrefs] = useState<string[]>([]); // e.g., ["Rust","Go","Java"]
   const [paths, setPaths] = useState<{ pathId: string; name: string; skills: string[] }[]>([]);
   const [selectedPathIds, setSelectedPathIds] = useState<string[]>([]);
+  const [clusterInfo, setClusterInfo] = useState<{id:string,name:string,sim:number}|null>(null);
 
   // --------- Agent orchestration state ---------
   const [agents, setAgents] = useState<AgentState>(newAgentState());
-  const resetAgents = () => setAgents(newAgentState());
-
+  const resetAgents = () => { setAgents(newAgentState()); setClusterInfo(null); };
   // helpers
   const appendLog = useCallback((k: AgentKey, line: string) => {
     setAgents((prev) => ({
@@ -358,8 +358,9 @@ export default function HomePage() {
       setProgress("C", JSON.parse(e.data).progress)
     );
     es.addEventListener("payload", (e: any) => {
-      const { gaps } = JSON.parse(e.data);
+      const { gaps, cluster, coverage } = JSON.parse(e.data);
       setGapsByJob((prev) => ({ ...prev, [jid]: gaps || [] }));
+      setClusterInfo(cluster || null); // optional: display "Matched cluster: Backend SWE (0.91)"
     });
     es.addEventListener("status", (e: any) => {
       const { status } = JSON.parse(e.data);
@@ -649,6 +650,11 @@ const onRunF = () => {
                       {(topJob!.score * 100).toFixed(1)}%
                     </div>
                   )}
+                  {a.key === "C" && topJob && clusterInfo && (
+                    <div className="text-xs">
+                      <span className="font-semibold">Role cluster:</span> {clusterInfo.name} ({(clusterInfo.sim*100).toFixed(1)}%)
+                    </div>
+                  )}
                   {a.key === "C" && topJob && (
                     <div className="text-xs">
                       <span className="font-semibold">Gaps ({(gapsByJob[topJob.id]?.length ?? 0)}):</span>{" "}
@@ -656,6 +662,7 @@ const onRunF = () => {
                         "—"}
                     </div>
                   )}
+                  
                   {a.key === "D" && paths.length > 0 && (
                     <div className="text-xs space-y-2">
                       <div className="font-semibold">Paths</div>

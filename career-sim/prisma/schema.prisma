@@ -190,3 +190,42 @@ model LearningPathRun { // optional: store chosen paths per run
 
   @@map("learning_path_run")
 }
+
+model SkillNode {
+  id         BigInt   @id @default(autoincrement())
+  name       String
+  esco_id    String?  @unique
+  onet_id    String?  @unique
+  parent_id  BigInt?
+  aliases    Json?
+  // VECTOR embedding  in TiDB;, set via raw SQL
+  @@index([parent_id])
+
+  parent     SkillNode? @relation("SkillTree", fields: [parent_id], references: [id])
+  children   SkillNode[] @relation("SkillTree")
+
+   roleClusters RoleClusterSkill[]
+
+  @@map("skill_node")
+}
+
+model RoleCluster {
+  cluster_id BigInt  @id @default(autoincrement())
+  name       String  @unique
+   // VECTOR centroid (JD embedding mean)
+   skills     RoleClusterSkill[]
+  @@map("role_cluster")
+}
+
+model RoleClusterSkill {
+  id         BigInt   @id @default(autoincrement())
+  cluster_id BigInt
+  skill_id   BigInt
+  weight     Float    @default(1.0)
+
+  cluster    RoleCluster @relation(fields: [cluster_id], references: [cluster_id])
+  skill      SkillNode   @relation(fields: [skill_id], references: [id])
+
+  @@unique([cluster_id, skill_id])
+  @@map("role_cluster_skill")
+}
