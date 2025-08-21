@@ -58,10 +58,19 @@ export async function GET(req: NextRequest) {
       case "A": {
         step(10);
         send("log", { line: "Uploading & embedding resume…" });
-        const r = await fetch(`${origin}/api/ingest`, {
+        const r = await fetch(`${origin}/api/ingest/profile`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId, resumeText: resume || "Resume via SSE" }),
+          body: JSON.stringify({
+            userId,
+            linkedinUrl: searchParams.get("linkedinUrl") || null,
+            resumeText: resume || "",
+            shortForm: {
+              yearsExperience: Number(searchParams.get("yearsExp") || "0"),
+              stacks: (searchParams.get("stacks") || "").split(",").filter(Boolean),
+              education: searchParams.get("education") || "",
+            },
+          }),
         });
         const j = await r.json();
         step(75);

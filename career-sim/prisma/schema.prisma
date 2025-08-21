@@ -19,6 +19,7 @@ model User {
   simulations      Simulation[]
   goal             UserGoal?
   learningPaths    LearningPath[]
+  UserProfile      UserProfile?
 
   @@map("users")
 }
@@ -247,4 +248,16 @@ model SalaryBenchmark {
 
   @@index([role, level, country, region, city])
   @@map("salary_benchmarks")
+}
+
+model UserProfile {
+  user_id          BigInt   @id
+  linkedin_url     String?
+  years_experience Int?     // 0..50
+  stacks           Json?    // ["Rust","Go","PostgreSQL"]
+  education        String?
+  updated_at       DateTime @updatedAt
+
+  user User @relation(fields: [user_id], references: [user_id])
+  @@map("user_profile")
 }

@@ -143,6 +143,10 @@ export default function HomePage() {
   const [salaryBaseline, setSalaryBaseline] = useState<any>(null);
   const [salaryDelta, setSalaryDelta] = useState<{currency:string; medianDelta:number|null}|null>(null);
   const [citationsByJob, setCitationsByJob] = useState<Record<string, Array<{skillId:string; name:string; start:number; end:number; snippet:string}>>>({});
+  const [linkedinUrl, setLinkedinUrl] = useState("");
+  const [yearsExp, setYearsExp] = useState<number | ''>('');
+  const [stackInput, setStackInput] = useState("");   // comma-separated entry
+  const [educationText, setEducationText] = useState("");
 
   // --------- Agent orchestration state ---------
   const [agents, setAgents] = useState<AgentState>(newAgentState());
@@ -291,6 +295,30 @@ export default function HomePage() {
       }),
     });
   }
+  async function saveProfile() {
+  const stacks = stackInput
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const res = await fetch("/api/ingest/profile", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      userId: "1",
+      linkedinUrl,
+      resumeText: resume, // optional — reuse paste if present
+      shortForm: {
+        yearsExperience: yearsExp === '' ? null : Number(yearsExp),
+        stacks,
+        education: educationText,
+      },
+    }),
+  });
+  const data = await res.json();
+  setMessage(data.ok ? "Profile saved & skills deduped" : data.error || "Failed to save profile");
+}
+
 
 
   // ------------- Agent wrappers -------------
@@ -787,6 +815,60 @@ const onRunF = () => {
           Upload Resume
         </Button>
       </section>
+
+      {/* Ingestion — LinkedIn + Short Form */}
+      <section className="rounded-xl border p-4 space-y-3">
+        <h2 className="text-lg font-semibold">Connect Profile</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-start">
+          <div className="sm:col-span-3 space-y-1">
+            <label className="block text-sm font-medium">LinkedIn URL</label>
+            <Input
+              value={linkedinUrl}
+              onChange={(e) => setLinkedinUrl(e.target.value)}
+              placeholder="https://www.linkedin.com/in/your-handle"
+              inputMode="url"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="block text-sm font-medium">Years of experience</label>
+            <Input
+              type="number"
+              min={0}
+              max={50}
+              value={yearsExp}
+              onChange={(e) => setYearsExp(e.target.value === "" ? "" : Number(e.target.value))}
+              placeholder="e.g., 4"
+              className="w-28"
+            />
+          </div>
+
+          <div className="space-y-1 sm:col-span-2">
+            <label className="block text-sm font-medium">Stacks (comma separated)</label>
+            <Input
+              value={stackInput}
+              onChange={(e) => setStackInput(e.target.value)}
+              placeholder="Rust, Tokio, Go, gRPC, PostgreSQL"
+            />
+            <p className="text-xs text-muted-foreground">We’ll dedupe and normalize against the skill catalog.</p>
+          </div>
+
+          <div className="sm:col-span-3 space-y-1">
+            <label className="block text-sm font-medium">Education</label>
+            <Textarea
+              value={educationText}
+              onChange={(e) => setEducationText(e.target.value)}
+              placeholder="e.g., BSc in Computer Science, University of X (2019)"
+              className="h-20"
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={saveProfile}>Save profile</Button>
+        </div>
+      </section>
+
 
       {/* Search controls */}
       <section className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">

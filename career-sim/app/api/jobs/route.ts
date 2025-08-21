@@ -12,6 +12,14 @@ export async function GET(req: NextRequest) {
   const role = url.searchParams.get("role") || "software engineer";
   const location = url.searchParams.get("location") || "";
   const remote = url.searchParams.get("remote") === "true";
+  if (!location) {
+    // try user profile city/country (basic)
+    const [prof] = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT education FROM user_profile WHERE user_id = ? LIMIT 1`,
+      BigInt(url.searchParams.get("userId") || "1").toString()
+    );
+    // (you can parse location out of education or store a location field later)
+  }
 
   const qParts = [role];
   if (location) qParts.push(`in ${location}`);
