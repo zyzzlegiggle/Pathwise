@@ -1,7 +1,7 @@
 // app/page.tsx
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -38,6 +38,15 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Slider } from "@/components/ui/slider";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { BadgeCheck, Play, FileDown, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils"; // if you have this helper
+import { ReferenceLine, Legend } from "recharts";
 
 type JobResult = {
   id: string; // backend returns string; was number before (fix)
@@ -150,6 +159,17 @@ export default function HomePage() {
   const [plans, setPlans] = useState<{id:string; title:string; createdAt:string}[]>([]);
   const [savedPaths, setSavedPaths] = useState<any[]>([]);
   const [savedSeries, setSavedSeries] = useState<any[]>([]);
+  const [weeklyHours, setWeeklyHours] = useState<number>(10);
+  const [activeSeries, setActiveSeries] = useState<string[]>([]);   // which series are visible
+  const [targetThreshold, setTargetThreshold] = useState<number>(75); // goal line on chart
+
+  useEffect(() => {
+  if (multiSeries.length) {
+    setActiveSeries(multiSeries.map((s) => s.label));
+  } else {
+    setActiveSeries(["Match score", "Qualification probability"]);
+  }
+  }, [multiSeries]);
   // --------- Agent orchestration state ---------
   const [agents, setAgents] = useState<AgentState>(newAgentState());
   const resetAgents = () => { setAgents(newAgentState()); setClusterInfo(null); };
@@ -266,7 +286,7 @@ export default function HomePage() {
       const res = await fetch("/api/simulate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: "1", jobId, weeklyHours: 10 }),
+        body: JSON.stringify({ userId: "1", jobId, weeklyHours }),
       });
       const data = await res.json();
       setSimSteps(data.steps ?? []);
@@ -600,65 +620,136 @@ const onRunF = () => {
   // derived
   const topJob = useMemo(() => jobs[0], [jobs]);
 
+  // compact circular score pill for job cards
+  const ScorePill: React.FC<{ score: number }> = ({ score }) => {
+    const pct = Math.max(0, Math.min(100, Math.round(score)));
+    return (
+      <div className="relative inline-flex items-center justify-center w-12 h-12 rounded-full"
+        style={{ background: `conic-gradient(hsl(var(--primary)) ${pct*3.6}deg, hsl(var(--muted-foreground)) 0)` }}>
+        <div className="absolute w-9 h-9 rounded-full bg-background border" />
+        <span className="text-xs font-semibold">{pct}%</span>
+      </div>
+    );
+  };
+
+  // Hours slider with label
+  const HoursSlider: React.FC<{ value:number; onChange:(v:number)=>void }> = ({ value, onChange }) => (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Label className="text-sm">Weekly learning hours</Label>
+        <span className="text-xs text-muted-foreground">{value}h/wk</span>
+      </div>
+      <Slider
+        value={[value]}
+        min={4}
+        max={20}
+        step={1}
+        onValueChange={(v)=> onChange(v[0] ?? value)}
+      />
+    </div>
+  );
+
+
   return (
     <main className="p-8 max-w-4xl mx-auto space-y-6">
       <h1 className="text-2xl font-bold">Career Clone Demo</h1>
-      {/* Goals form */}
-      <section className="rounded-xl border p-4 space-y-3 mb-3">
-        <h3 className="text-sm font-semibold">Pick Goals</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
-          <Input
-            value={goalRole}
-            onChange={(e) => setGoalRole(e.target.value)}
-            placeholder="Target role (e.g., backend SWE)"
-          />
-          <div className="flex items-center gap-2">
-            <Input
-              type="number"
-              min={1}
-              value={goalMonths[0]}
-              onChange={(e) => setGoalMonths([Number(e.target.value), goalMonths[1]])}
-              placeholder="Min months"
-               className="w-24"
-            />
-            <span className="text-sm text-muted-foreground">to</span>
-            <Input
-              type="number"
-              min={goalMonths[0]}
-              value={goalMonths[1]}
-              onChange={(e) => setGoalMonths([goalMonths[0], Number(e.target.value)])}
-              placeholder="Max months"
-               className="w-24"
-            />
-            <span className="text-sm">months</span>
+
+      {/* Goals & Preferences */}
+      <section className="rounded-xl border p-4 mb-3">
+        <Tabs defaultValue="goal" className="w-full">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold">Plan your target</h3>
+            <div className="flex gap-2">
+              <Button variant="secondary" onClick={saveGoals} size="sm">Save goals</Button>
+              <Button onClick={runAll} size="sm"><Play className="mr-1 h-4 w-4"/>Run pipeline</Button>
+            </div>
           </div>
 
-          <div className="flex flex-wrap gap-2 sm:col-span-2">
-            {["Rust","Go","Java","Python","LLM apps","Data Eng","MLOps"].map((t) => {
-              const on = stackPrefs.includes(t);
-              return (
-                <Button
-                  key={t}
-                  type="button"
-                  size="sm"
-                  variant={on ? "default" : "outline"}
-                  onClick={() =>
-                    setStackPrefs((prev) => (on ? prev.filter((x) => x !== t) : [...prev, t]))
-                  }
-                >
-                  {t}
-                </Button>
-              );
-            })}
-          </div>
-        </div>
+          <TabsList className="grid grid-cols-3 w-full">
+            <TabsTrigger value="goal">Goal</TabsTrigger>
+            <TabsTrigger value="prefs">Preferences</TabsTrigger>
+            <TabsTrigger value="runtime">Simulation</TabsTrigger>
+          </TabsList>
 
-        <div className="flex gap-2 justify-end mt-2">
-          <Button variant="secondary" onClick={saveGoals}>Save goals</Button>
-          {/* Optional: run all with current goals */}
-          <Button onClick={runAll}>Run all (A→F) with goals</Button>
-        </div>
+          <TabsContent value="goal" className="mt-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="sm:col-span-2">
+                <Label className="text-sm">Target role</Label>
+                <Input
+                  value={goalRole}
+                  onChange={(e) => setGoalRole(e.target.value)}
+                  placeholder="e.g., Backend SWE"
+                  className="mt-1"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-sm">Timeframe (months)</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number" min={1}
+                    value={goalMonths[0]}
+                    onChange={(e)=> setGoalMonths([Number(e.target.value), goalMonths[1]])}
+                    className="w-24"
+                  />
+                  <span className="text-sm text-muted-foreground">to</span>
+                  <Input
+                    type="number" min={goalMonths[0]}
+                    value={goalMonths[1]}
+                    onChange={(e)=> setGoalMonths([goalMonths[0], Number(e.target.value)])}
+                    className="w-24"
+                  />
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="prefs" className="mt-4">
+            <Label className="text-sm">Tech focus</Label>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {["Rust","Go","Java","Python","LLM apps","Data Eng","MLOps"].map((t) => {
+                const on = stackPrefs.includes(t);
+                return (
+                  <Button
+                    key={t}
+                    type="button"
+                    size="sm"
+                    variant={on ? "default" : "outline"}
+                    onClick={() =>
+                      setStackPrefs((prev) => (on ? prev.filter((x) => x !== t) : [...prev, t]))
+                    }
+                  >
+                    {t}
+                  </Button>
+                );
+              })}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="runtime" className="mt-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="sm:col-span-2">
+                <HoursSlider value={weeklyHours} onChange={(v)=> setWeeklyHours(v)} />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm">Target qualification</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number" min={50} max={100}
+                    value={targetThreshold}
+                    onChange={(e)=> setTargetThreshold(Number(e.target.value))}
+                    className="w-24"
+                  />
+                  <span className="text-sm text-muted-foreground">%</span>
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              We’ll draw a goal line at the target qualification and overlay scenarios (8/10/15h).
+            </p>
+          </TabsContent>
+        </Tabs>
       </section>
+
 
       {/* Agent Orchestrator */}
       <Dialog>
@@ -960,47 +1051,40 @@ const onRunF = () => {
       </section>
 
 
-      {/* Search controls */}
-      <section className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
-        <div className="space-y-1">
-          <label className="block text-sm font-medium">Role / Keyword</label>
-          <Input
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            placeholder="e.g., backend developer"
-          />
+      {/* Job Finder */}
+      <section className="rounded-xl border p-4 space-y-3">
+        <h2 className="text-lg font-semibold">Find target openings</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 items-end">
+          <div className="sm:col-span-2">
+            <Label className="text-sm">Role / Keyword</Label>
+            <Input value={role} onChange={(e)=> setRole(e.target.value)} placeholder="e.g., backend developer" />
+          </div>
+          <div className="sm:col-span-2">
+            <Label className="text-sm">Location</Label>
+            <Input value={location} onChange={(e)=> setLocation(e.target.value)} placeholder="e.g., Singapore" />
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch id="remoteOnly" checked={remoteOnly} onCheckedChange={(v)=> setRemoteOnly(Boolean(v))}/>
+            <Label htmlFor="remoteOnly" className="text-sm">Remote only</Label>
+          </div>
         </div>
-        <div className="space-y-1">
-          <label className="block text-sm font-medium">Location</label>
-          <Input
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            placeholder="e.g., Kuala Lumpur"
-          />
-        </div>
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="remoteOnly"
-            checked={remoteOnly}
-            onCheckedChange={(v) => setRemoteOnly(Boolean(v))}
-          />
-          <label htmlFor="remoteOnly" className="text-sm">
-            Remote only
-          </label>
+        <div className="flex flex-wrap gap-2 justify-end">
+          <Button onClick={fetchJobs} disabled={loading} variant="secondary">
+            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Fetch JSearch
+          </Button>
+          <Button onClick={findSimilar} disabled={loading} variant="outline">
+            Find Similar Jobs
+          </Button>
         </div>
       </section>
 
-      {/* Actions */}
-      <div className="flex gap-4">
-        <Button onClick={fetchJobs} disabled={loading} variant="secondary">
-          Fetch JSearch
-        </Button>
-        <Button onClick={findSimilar} disabled={loading} variant="outline">
-          Find Similar Jobs
-        </Button>
-      </div>
 
-      {message && <p className="text-gray-700">{message}</p>}
+      {message && (
+        <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
+          {message}
+        </div>
+      )}
 
       {jobs.length > 0 && (
         <div className="flex items-center gap-2">
@@ -1031,155 +1115,182 @@ const onRunF = () => {
       <div className="grid gap-4 mt-6">
         {jobs.map((job) => (
           <Card key={job.id} className="shadow-sm">
-            <CardHeader>
-              <CardTitle>{job.title}</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                {job.company} • {job.location}
-              </p>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm">
-                Match Score: <strong>{(job.score * 100).toFixed(1)}%</strong>
-              </p>
-            </CardContent>
-            <CardFooter className="flex gap-3 flex-wrap">
-              {job.url ? (
-                <a
-                  href={job.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-blue-600 underline text-sm"
-                >
-                  View job posting
-                </a>
-              ) : null}
-
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => analyzeGaps(job.id)}
-                disabled={loading}
-              >
-                Analyze gaps
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => simulate(job.id)}
-                disabled={loading}
-              >
-                Simulate 12 weeks
-              </Button>
-            </CardFooter>
-
-            {gapsByJob[job.id]?.length ? (
-              <div className="px-6 pb-4">
-                <Separator className="my-3" />
-                <p className="text-sm font-medium mb-2">Missing skills</p>
-                <div className="flex flex-wrap gap-2">
-                  {gapsByJob[job.id].map((skill) => (
-                    <div key={skill} className="flex items-center gap-2">
-                      <Badge variant="secondary">{skill}</Badge>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-6 px-2 text-xs"
-                        onClick={() => fetchResources(skill)}
-                        disabled={loading}
-                      >
-                        resources
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-
-                {/* resources for any clicked skill */}
-                <div className="mt-3 space-y-3">
-                  {gapsByJob[job.id].map((skill) =>
-                    resourcesBySkill[skill]?.length ? (
-                      <div key={`res-${skill}`} className="rounded-md border p-3">
-                        <p className="text-sm font-semibold mb-1">
-                          Resources for {skill}
-                        </p>
-                        <ul className="list-disc pl-5 space-y-1">
-                          {resourcesBySkill[skill].map((r, i) => (
-                            <li key={`${skill}-${i}`} className="text-sm">
-                              <a
-                                href={r.url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="underline"
-                              >
-                                {r.title}
-                              </a>{" "}
-                              <span className="text-muted-foreground">
-                                • {r.provider}
-                                {r.hours_estimate ? ` • ~${r.hours_estimate}h` : ""}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ) : null
-                  )}
-                </div>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <div>
+                <CardTitle className="text-base">{job.title}</CardTitle>
+                <p className="text-sm text-muted-foreground">{job.company} • {job.location}</p>
               </div>
-            ) : null}
+              <div className="flex items-center gap-3">
+                <ScorePill score={job.score * 100} />
+                <Button
+                  size="sm"
+                  variant={selectedJobId === job.id ? "default" : "outline"}
+                  onClick={() => {
+                    setSelectedJobId(job.id);
+                    const top3 = jobs.slice(0, 3).map((j) => j.id);
+                    setCitedJobIds(Array.from(new Set([job.id, ...top3])).slice(0, 5));
+                  }}
+                >
+                  Set Target
+                </Button>
+              </div>
+            </CardHeader>
+
+            <CardContent className="space-y-3">
+              <div className="flex flex-wrap gap-3">
+                {job.url && (
+                  <a href={job.url} target="_blank" rel="noreferrer" className="underline text-sm">
+                    View posting
+                  </a>
+                )}
+                <Button size="sm" variant="secondary" onClick={() => analyzeGaps(job.id)} disabled={loading}>
+                  Analyze gaps
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => simulate(job.id)} disabled={loading}>
+                  Simulate 12 weeks
+                </Button>
+              </div>
+
+              {/* Missing skills + resources */}
+              {gapsByJob[job.id]?.length ? (
+                <Collapsible>
+                  <CollapsibleTrigger asChild>
+                    <Button size="sm" variant="ghost" className="px-0">
+                      Show missing skills ({gapsByJob[job.id].length})
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-2 space-y-3">
+                    <div className="flex flex-wrap gap-2">
+                      {gapsByJob[job.id].map((skill) => (
+                        <Badge key={skill} variant="secondary" className="text-xs">
+                          {skill}
+                        </Badge>
+                      ))}
+                    </div>
+                    {/* resources rows */}
+                    <div className="space-y-3">
+                      {gapsByJob[job.id].map((skill) =>
+                        resourcesBySkill[skill]?.length ? (
+                          <div key={`res-${skill}`} className="rounded-md border p-3">
+                            <p className="text-sm font-semibold mb-1">Resources for {skill}</p>
+                            <ul className="list-disc pl-5 space-y-1">
+                              {resourcesBySkill[skill].map((r, i) => (
+                                <li key={`${skill}-${i}`} className="text-sm">
+                                  <a href={r.url} target="_blank" rel="noreferrer" className="underline">{r.title}</a>{" "}
+                                  <span className="text-muted-foreground">• {r.provider}{r.hours_estimate ? ` • ~${r.hours_estimate}h` : ""}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : (
+                          <Button
+                            key={`btn-${skill}`}
+                            size="sm"
+                            variant="outline"
+                            onClick={() => fetchResources(skill)}
+                            disabled={loading}
+                          >
+                            Find {skill} resources
+                          </Button>
+                        )
+                      )}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              ) : null}
+            </CardContent>
           </Card>
         ))}
       </div>
 
+
       {/* simulation chart with multi-path overlay */}
       {(multiSeries.length > 0 || simSteps.length > 0) && (
-        <section className="mt-10">
-          <h2 className="text-lg font-semibold mb-2">
-            Simulation — Qualification vs Weeks{" "}
-            {selectedJobId ? `(Job #${selectedJobId})` : ""}
-          </h2>
-          <div className="w-full h-64 rounded-lg border p-3">
+        <section className="mt-10 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">
+              Simulation — Qualification vs Weeks {selectedJobId ? `(Job #${selectedJobId})` : ""}
+            </h2>
+            <div className="flex items-center gap-3">
+              <HoursSlider value={weeklyHours} onChange={(v)=> setWeeklyHours(v)} />
+              <Button
+                size="sm"
+                onClick={() => {
+                  // re-run E with hours variants around selection for comparison
+                  setSelectedPathIds((p) => p.slice(0, 3));
+                  onRunE();
+                }}
+              >
+                Re-simulate
+              </Button>
+            </div>
+          </div>
+
+          {/* Series toggles */}
+          <div className="flex flex-wrap gap-2">
+            {(multiSeries.length ? multiSeries.map(s => s.label) : ["Match score","Qualification probability"]).map((label) => {
+              const on = activeSeries.includes(label);
+              return (
+                <Button
+                  key={label}
+                  size="sm"
+                  variant={on ? "default" : "outline"}
+                  onClick={() =>
+                    setActiveSeries((prev) =>
+                      prev.includes(label) ? prev.filter((l) => l !== label) : [...prev, label]
+                    )
+                  }
+                >
+                  {on ? <BadgeCheck className="mr-1 h-4 w-4" /> : null}
+                  {label}
+                </Button>
+              );
+            })}
+          </div>
+
+          <div className="w-full h-72 rounded-lg border p-3">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
-              data={(multiSeries[0]?.steps || simSteps).map((row, idx) => {
-                const base: Record<string, any> = { 
-                  week: row.week, 
-                  score: row.score, 
-                  prob: row.prob 
-                }
-                multiSeries.forEach((s, si) => {
-                  base[`s${si}`] = s.steps[idx]?.score ?? null
-                })
-                return base
-              })}
-            >
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="week" />
-              <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
-              <Tooltip
-                formatter={(val: any) => (val == null ? "—" : `${val}%`)}
-                labelFormatter={(l) => `Week ${l}`}
-              />
-              {multiSeries.length > 0
-                ? multiSeries.map((s, i) => (
-                    <Line
-                      key={s.label}
-                      type="monotone"
-                      dataKey={`s${i}`}
-                      name={s.label}
-                      dot
-                    />
-                  ))
-                : (
+                data={(multiSeries[0]?.steps || simSteps).map((row, idx) => {
+                  const base: Record<string, any> = { week: row.week, score: row.score, prob: row.prob };
+                  multiSeries.forEach((s, si) => { base[s.label] = s.steps[idx]?.score ?? null; });
+                  return base;
+                })}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="week" />
+                <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
+                <Tooltip formatter={(val: any, name: string) => (val == null ? "—" : `${val}%`)} labelFormatter={(l) => `Week ${l}`} />
+                <Legend />
+                {/* goal line */}
+                <ReferenceLine y={targetThreshold} strokeDasharray="4 4" />
+
+                {/* draw lines only if enabled */}
+                {multiSeries.length > 0 ? (
+                  multiSeries.map((s) =>
+                    activeSeries.includes(s.label) ? (
+                      <Line key={s.label} type="monotone" dataKey={s.label} name={s.label} dot />
+                    ) : null
+                  )
+                ) : (
                   <>
-                    <Line type="monotone" dataKey="score" name="Match score" dot />
-                    <Line type="monotone" dataKey="prob"  name="Qualification probability" dot />
+                    {activeSeries.includes("Match score") && (
+                      <Line type="monotone" dataKey="score" name="Match score" dot />
+                    )}
+                    {activeSeries.includes("Qualification probability") && (
+                      <Line type="monotone" dataKey="prob" name="Qualification probability" dot />
+                    )}
                   </>
                 )}
-            </LineChart>
-
+              </LineChart>
             </ResponsiveContainer>
           </div>
+          <p className="text-xs text-muted-foreground">
+            The dashed line marks your target qualification ({targetThreshold}%). Toggle series to compare scenarios.
+          </p>
         </section>
       )}
+
     </main>
   );
 }

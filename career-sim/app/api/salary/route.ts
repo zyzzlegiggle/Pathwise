@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
   if (!samples.length) {
     const bench = await prisma.salaryBenchmark.findFirst({
       where: {
-        role: { equals: role, mode: "insensitive" },
+        role: { equals: role, lte: "insensitive" },
         country: country ?? undefined,
         city: city ?? undefined,
         ...(level ? { level } : {}),
