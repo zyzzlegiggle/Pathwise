@@ -147,7 +147,9 @@ export default function HomePage() {
   const [yearsExp, setYearsExp] = useState<number | ''>('');
   const [stackInput, setStackInput] = useState("");   // comma-separated entry
   const [educationText, setEducationText] = useState("");
-
+  const [plans, setPlans] = useState<{id:string; title:string; createdAt:string}[]>([]);
+  const [savedPaths, setSavedPaths] = useState<any[]>([]);
+  const [savedSeries, setSavedSeries] = useState<any[]>([]);
   // --------- Agent orchestration state ---------
   const [agents, setAgents] = useState<AgentState>(newAgentState());
   const resetAgents = () => { setAgents(newAgentState()); setClusterInfo(null); };
@@ -319,6 +321,53 @@ export default function HomePage() {
   setMessage(data.ok ? "Profile saved & skills deduped" : data.error || "Failed to save profile");
 }
 
+  async function saveCurrentPlan() {
+    const title =
+      `Plan — ${goalRole || "Target Role"} — ${new Date().toLocaleString()}`;
+
+    const res = await fetch("/api/plans", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: "1",
+        title,
+        inputs: {
+          goalRole,
+          timeframeMin: goalMonths[0],
+          timeframeMax: goalMonths[1],
+          stackPrefs,
+          targetJobTitle: jobs.find(j=>j.id===selectedJobId)?.title ?? "",
+          targetLocation: jobs.find(j=>j.id===selectedJobId)?.location ?? "",
+          pathIds: selectedPathIds,
+        },
+        sources: {
+          citedJobs: citedJobIds.map((id) => {
+            const j = jobs.find((x) => x.id === id);
+            return { id, title: j?.title || "Unknown", url: j?.url || null };
+          }),
+          salarySources: [salaryTarget?.source, salaryBaseline?.source].filter(Boolean),
+        },
+        outputs: {
+          missing: selectedJobId ? (gapsByJob[selectedJobId] || []) : [],
+          paths: savedPaths,
+          series: savedSeries,
+          salaryTarget,
+          salaryBaseline,
+          delta: salaryDelta,
+          explanation, // Agent F summary text
+        },
+      }),
+    });
+    const data = await res.json();
+    setMessage(data.ok ? `Saved plan #${data.planId}` : "Failed to save plan");
+  }
+
+  async function refreshPlans() {
+  const r = await fetch("/api/plans?userId=1");
+  const j = await r.json();
+  setPlans(j.plans || []);
+  }
+
 
 
   // ------------- Agent wrappers -------------
@@ -430,6 +479,7 @@ const onRunD = () => {
     setResourcesBySkill((prev) => ({ ...prev, ...resources }));
     if (p) {
       setPaths(p);
+      setSavedPaths(p);
       setSelectedPathIds(p.slice(0, 2).map((x: any) => x.pathId)); // preselect top 2
     }
   });
@@ -463,6 +513,7 @@ const onRunE = () => {
   es.addEventListener("payload", (e: any) => {
     const { series, salary } = JSON.parse(e.data);
     setMultiSeries(series || []);
+    if (series) setSavedSeries(series);
     // also keep single-series backward compat
     if (salary) setSalaryTarget(salary);
     
@@ -787,6 +838,45 @@ const onRunF = () => {
                       </div>
                     </div>
                   )}
+
+                  {plans.length > 0 && (
+                  <section className="rounded-xl border p-4 space-y-2 mt-3">
+                    <h3 className="text-sm font-semibold">My Plans</h3>
+                    <ul className="space-y-1 text-sm">
+                      {plans.map((p) => (
+                        <li key={p.id} className="flex items-center justify-between">
+                          <span>{p.title}</span>
+                          <div className="flex gap-2">
+                            <a
+                              href={`/api/export?planId=${p.id}&format=md`}
+                              className="underline"
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              Export .md
+                            </a>
+                            <a
+                              href={`/api/export?planId=${p.id}&format=pdf`}
+                              className="underline"
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              Export .pdf
+                            </a>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="flex gap-2">
+                      <Button onClick={saveCurrentPlan}>Save plan</Button>
+                      {plans.length === 0 ? (
+                        <Button variant="outline" onClick={refreshPlans}>Load My Plans</Button>
+                      ) : null}
+                    </div>
+                  </section>
+                )}
+
+
 
                 </CardContent>
               </Card>

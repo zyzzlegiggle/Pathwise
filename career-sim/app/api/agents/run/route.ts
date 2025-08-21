@@ -2,6 +2,7 @@
 import { NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
+type SimJob = { id: string; title?: string; url?: string };
 
 function sse(responder: (send: (ev: string, data: any) => void) => Promise<void>) {
   const encoder = new TextEncoder();
@@ -215,7 +216,44 @@ export async function GET(req: NextRequest) {
           delta = { currency: targetSalary.currency, medianDelta: targetSalary.median - baseSalary.median };
         }
         step(100);
-        send("payload", { citedJobs });
+        send("payload", {
+          citedJobs,
+          salaryTarget: targetSalary,
+          salaryBaseline: baseSalary,
+          delta,
+        saveable: {
+          inputs: {
+            goalRole: targetRoleFromUI || "Software Engineer",
+            timeframeMin, timeframeMax,
+            stackPrefs,
+            targetJobTitle: targetRoleFromUI || "",
+            targetLocation: targetLocQ || "",
+            pathIds: (searchParams.get("pathIds") || "").split(",").filter(Boolean),
+          },
+          sources: {
+            citedJobs: await (async () => {
+              try {
+                const sim = await fetch(`${origin}/api/similar?userId=${userId}`).then(r=>r.json());
+                const map = new Map<string, SimJob>(sim.jobs?.map((j: SimJob) => [String(j.id), j]) ?? []);
+                return citedJobs.map((id)=>({
+                  id, title: map.get(String(id))?.title || "Unknown",
+                  url: map.get(String(id))?.url || null
+                }));
+              } catch { return citedJobs.map((id)=>({id})); }
+            })(),
+            salarySources: [targetSalary?.source, baseSalary?.source].filter(Boolean),
+          },
+          outputs: {
+            missing: (searchParams.get("missing") ? JSON.parse(searchParams.get("missing")!) : undefined), // optional if you pass via params
+            series: undefined, // Agent E already streamed; client can attach
+            salaryTarget: targetSalary,
+            salaryBaseline: baseSalary,
+            delta,
+            explanation: undefined, // client adds final explanation text
+            paths: undefined,       // client attaches chosen paths
+          }
+        }
+        });
         send("log", { line: "Report generated." });
         break;
       }
