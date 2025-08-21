@@ -55,6 +55,9 @@ export async function GET(req: NextRequest) {
       const urlApply = (it.job_apply_link ||
         it.job_apply_url ||
         it.job_google_link) as string | undefined;
+      const min = Number(it.job_min_salary ?? it.min_salary ?? NaN);
+      const max = Number(it.job_max_salary ?? it.max_salary ?? NaN);
+      const curr = (it.job_salary_currency || it.salary_currency || "").toString() || null;
 
       // Concise description to embed
       const description = [
@@ -83,6 +86,9 @@ export async function GET(req: NextRequest) {
               location: loc || null,
               url: urlApply || null,
               // you can also set currency/min_salary/max_salary/post_date here if available
+              currency: curr,
+              min_salary: Number.isFinite(min) ? Math.round(min) : null,
+              max_salary: Number.isFinite(max) ? Math.round(max) : null,
             },
             select: { job_id: true },
           })

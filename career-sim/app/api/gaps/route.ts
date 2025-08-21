@@ -8,6 +8,8 @@ export async function GET(req: NextRequest) {
   const topKSkills = Number(url.searchParams.get("k") || "40"); // skills to consider from JD
   const coverageThreshold = Number(url.searchParams.get("t") || "0.25"); // min sim to count as “mentioned”
 
+ 
+
   // 0) load user skills and normalize to ontology nodes (by name/alias OR nearest neighbor)
   const userSkillsRaw = await prisma.userSkill.findMany({
     where: { user_id: userId },
@@ -50,12 +52,13 @@ export async function GET(req: NextRequest) {
   }
 
   // 1) fetch job embedding
-  const [jemb] = await prisma.$queryRawUnsafe<any[]>(
-    `SELECT embedding FROM job_texts WHERE job_id = ?`,
-    jobId.toString()
-  );
-  if (!jemb?.embedding) return NextResponse.json({ missing: [], cluster: null, coverage: [] });
-
+   const [jrow] = await prisma.$queryRawUnsafe<any[]>(
+     `SELECT embedding, description FROM job_texts WHERE job_id = ?`,
+     jobId.toString()
+   );
+   if (!jrow?.embedding) return NextResponse.json({ missing: [], cluster: null, coverage: [], citations: [] });
+   const jobDescRaw: string = jrow.description || "";
+   const jobDesc = jobDescRaw.toLowerCase();
   // 2) extract skills mentioned in JD via embedding similarity (top-K)
   const jdSkills = await prisma.$queryRawUnsafe<any[]>(
     `SELECT id, name,
@@ -63,7 +66,7 @@ export async function GET(req: NextRequest) {
      FROM skill_node
      ORDER BY sim DESC
      LIMIT ?`,
-    jemb.embedding,
+    jrow.embedding,
     String(topKSkills)
   );
   const mentionedIds = new Set<string>(jdSkills.filter((r: any) => r.sim >= coverageThreshold).map((r: any) => String(r.id)));
@@ -75,7 +78,7 @@ export async function GET(req: NextRequest) {
      FROM role_cluster
      ORDER BY sim DESC
      LIMIT 1`,
-    jemb.embedding
+    jrow.embedding
   );
   if (!bestCluster) return NextResponse.json({ missing: [], cluster: null, coverage: [] });
 
@@ -106,6 +109,7 @@ export async function GET(req: NextRequest) {
 
   const coverage: { skillId: string; name: string; required: number; mentioned: boolean; userHas: boolean }[] = [];
   const missing: string[] = [];
+  const citations: { skillId: string; name: string; start: number; end: number; snippet: string }[] = [];
 
   for (const s of reqSkill) {
     const sid = String(s.skill_id);
@@ -116,6 +120,18 @@ export async function GET(req: NextRequest) {
       const p = await getParentId(sid);
       if (p && userNodeIds.has(p)) userHas = true;
     }
+     if (mentioned) {
+   const span = await findSpanForSkill(BigInt(sid), s.name);
+   if (span) {
+     // persist
+     await prisma.jobSkillEvidence.upsert({
+       where: { job_id_skill_id_start_end: { job_id: jobId, skill_id: BigInt(sid), start: span.start, end: span.end } as any },
+       create: { job_id: jobId, skill_id: BigInt(sid), start: span.start, end: span.end, snippet: span.snippet },
+       update: { snippet: span.snippet },
+     });
+     citations.push({ skillId: sid, name: s.name, start: span.start, end: span.end, snippet: span.snippet });
+   }
+ }
     coverage.push({ skillId: sid, name: s.name, required: s.weight, mentioned, userHas });
     if (!userHas && mentioned) missing.push(s.name);
   }
@@ -127,5 +143,36 @@ export async function GET(req: NextRequest) {
     cluster: { id: String(bestCluster.cluster_id), name: bestCluster.name, sim: Number(bestCluster.sim?.toFixed(3) || 0) },
     missing,
     coverage, // useful for UI: show required/mentioned/userHas flags
+    citations,
   });
+
+   // helper to locate best substring span for a skill (name + aliases)
+ async function findSpanForSkill(skillId: bigint, fallbackName: string) {
+   // fetch aliases quickly
+   const node = await prisma.skillNode.findUnique({
+     where: { id: skillId },
+     select: { name: true, aliases: true },
+   });
+   const cands = [node?.name || fallbackName, ...((node?.aliases as string[]) || [])]
+     .filter(Boolean)
+     .map((s) => String(s).toLowerCase());
+   let best: { start: number; end: number } | null = null;
+   for (const term of cands) {
+     const idx = jobDesc.indexOf(term);
+     if (idx >= 0) {
+       const start = idx;
+       const end = idx + term.length;
+       if (!best || (end - start) > (best.end - best.start)) best = { start, end };
+     }
+   }
+   if (!best) return null;
+   // build windowed snippet (~80 chars around)
+   const pad = 80;
+   const s = Math.max(0, best.start - pad);
+   const e = Math.min(jobDescRaw.length, best.end + pad);
+   const snippet = jobDescRaw.slice(s, e).replace(/\s+/g, " ").trim();
+   return { ...best, snippet };
+ }
 }
+
+

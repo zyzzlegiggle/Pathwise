@@ -44,6 +44,9 @@ export async function GET(req: NextRequest) {
   const stackPrefs = (searchParams.get("stackPrefs") || "").split(",").filter(Boolean);
   const useLLM = searchParams.get("useLLM") === "true";
   const origin = req.nextUrl.origin;
+  const targetRoleFromUI = searchParams.get("targetRole") || "";
+  const baselineRole     = searchParams.get("baselineRole") || "";
+  const baselineLocation = searchParams.get("baselineLocation") || "";
   
 
   return sse(async (send) => {
@@ -94,6 +97,7 @@ export async function GET(req: NextRequest) {
           gaps: j.missing || [],
           cluster: j.cluster || null,
           coverage: j.coverage || [],
+          citations: j.citations || [],
         });
         send("log", { line: `Detected ${j.missing?.length ?? 0} missing skills.` });
         break;
@@ -168,7 +172,11 @@ export async function GET(req: NextRequest) {
           step(Math.min(15 + Math.round((idx / Math.max(1, pathLoop.length * variants.length)) * 80), 99));        }
         }
         step(100);
-        send("payload", { series });
+        const jobMeta = jobId ? await fetch(`${origin}/api/similar?userId=${userId}`).then(r=>r.json()).catch(()=>({})) : {};
+        const targetTitle = targetRoleFromUI || (jobMeta.jobs?.find((j:any)=> String(j.id)===String(jobId))?.title) || "";
+        const targetLoc   = (jobMeta.jobs?.find((j:any)=> String(j.id)===String(jobId))?.location) || "";
+        const sal = await fetch(`${origin}/api/salary?role=${encodeURIComponent(targetTitle)}&location=${encodeURIComponent(targetLoc)}`).then(r=>r.json()).catch(()=>null);
+        send("payload", { series, salary: sal });
         send("log", { line: "Simulation complete for all variants." });
         break;
       }
@@ -177,6 +185,26 @@ export async function GET(req: NextRequest) {
         // Expect citedJobs param as comma-separated job IDs chosen by the client
         const citedJobs = (searchParams.get("citedJobs") || "").split(",").filter(Boolean);
         send("log", { line: `Generating explanation for ${citedJobs.length} citations…` });
+        const targetRoleQ = targetRoleFromUI || "Software Engineer";
+        // pick a location from first cited job if available
+        let targetLocQ = "";
+        try {
+          const first = citedJobs[0];
+          if (first) {
+            const job = await fetch(`${origin}/api/similar?userId=${userId}`).then(r=>r.json());
+            const hit = job.jobs?.find((j:any)=> String(j.id)===String(first));
+            targetLocQ = hit?.location || "";
+          }
+        } catch {}
+        const targetSalary = await fetch(`${origin}/api/salary?role=${encodeURIComponent(targetRoleQ)}&location=${encodeURIComponent(targetLocQ)}`).then(r=>r.json()).catch(()=>null);
+        const baseSalary = (baselineRole || baselineLocation)
+        ? await fetch(`${origin}/api/salary?role=${encodeURIComponent(baselineRole || targetRoleQ)}&location=${encodeURIComponent(baselineLocation || "")}`).then(r=>r.json()).catch(()=>null)
+        : null;
+
+        let delta = null as null | { currency: string; medianDelta: number | null };
+        if (targetSalary?.median && baseSalary?.median && targetSalary.currency === baseSalary.currency) {
+          delta = { currency: targetSalary.currency, medianDelta: targetSalary.median - baseSalary.median };
+        }
         step(100);
         send("payload", { citedJobs });
         send("log", { line: "Report generated." });

@@ -33,6 +33,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Tooltip as TooltipShadcn,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 type JobResult = {
   id: string; // backend returns string; was number before (fix)
@@ -134,6 +139,10 @@ export default function HomePage() {
   const [paths, setPaths] = useState<{ pathId: string; name: string; skills: string[] }[]>([]);
   const [selectedPathIds, setSelectedPathIds] = useState<string[]>([]);
   const [clusterInfo, setClusterInfo] = useState<{id:string,name:string,sim:number}|null>(null);
+  const [salaryTarget, setSalaryTarget] = useState<any>(null);
+  const [salaryBaseline, setSalaryBaseline] = useState<any>(null);
+  const [salaryDelta, setSalaryDelta] = useState<{currency:string; medianDelta:number|null}|null>(null);
+  const [citationsByJob, setCitationsByJob] = useState<Record<string, Array<{skillId:string; name:string; start:number; end:number; snippet:string}>>>({});
 
   // --------- Agent orchestration state ---------
   const [agents, setAgents] = useState<AgentState>(newAgentState());
@@ -358,9 +367,12 @@ export default function HomePage() {
       setProgress("C", JSON.parse(e.data).progress)
     );
     es.addEventListener("payload", (e: any) => {
-      const { gaps, cluster, coverage } = JSON.parse(e.data);
+      const { gaps, cluster, coverage, citations } = JSON.parse(e.data);
       setGapsByJob((prev) => ({ ...prev, [jid]: gaps || [] }));
       setClusterInfo(cluster || null); // optional: display "Matched cluster: Backend SWE (0.91)"
+      if (citations?.length) {
+         setCitationsByJob((prev) => ({ ...prev, [jid]: citations }));
+       }
     });
     es.addEventListener("status", (e: any) => {
       const { status } = JSON.parse(e.data);
@@ -421,9 +433,10 @@ const onRunE = () => {
     setProgress("E", JSON.parse(e.data).progress)
   );
   es.addEventListener("payload", (e: any) => {
-    const { series } = JSON.parse(e.data);
+    const { series, salary } = JSON.parse(e.data);
     setMultiSeries(series || []);
     // also keep single-series backward compat
+    if (salary) setSalaryTarget(salary);
     
     const base = series?.find((s: any) => s.label === "10h/wk") || series?.[0];
     if (base) setSimSteps(base.steps);
@@ -442,13 +455,14 @@ const onRunF = () => {
     agent: "F",
     userId: "1",
     citedJobs: citedJobIds.join(","),
+    targetRole: goalRole || (jobs.find(j=>j.id===selectedJobId)?.title ?? "Software Engineer"),
   });
   es.addEventListener("log", (e: any) => appendLog("F", JSON.parse(e.data).line));
   es.addEventListener("progress", (e: any) =>
     setProgress("F", JSON.parse(e.data).progress)
   );
   es.addEventListener("payload", (e: any) => {
-    const { citedJobs } = JSON.parse(e.data);
+    const { citedJobs, salaryTarget, salaryBaseline, delta } = JSON.parse(e.data);
     // build a short explanation that cites titles/urls from current jobs list
     const lookup = new Map(jobs.map((j) => [j.id, j]));
     const picked = citedJobs
@@ -476,7 +490,14 @@ const onRunF = () => {
       ]
         .filter(Boolean)
         .join("\n");
+    if (selectedJobId && citationsByJob[selectedJobId]?.length) {
+      const lines = citationsByJob[selectedJobId].slice(0, 6).map((c) => `• ${c.name}: “…${c.snippet.slice(0, 120)}…”`);
+      setExplanation((prev) => `${prev}\n\nEvidence:\n${lines.join("\n")}`);
+    }
     setExplanation(summary);
+    setSalaryTarget(salaryTarget || null);
+    setSalaryBaseline(salaryBaseline || null);
+    setSalaryDelta(delta || null);
   });
   es.addEventListener("status", (e: any) => {
     const { status } = JSON.parse(e.data);
@@ -694,6 +715,51 @@ const onRunF = () => {
                   {a.key === "F" && explanation && (
                     <pre className="text-xs whitespace-pre-wrap">{explanation}</pre>
                   )}
+                  {a.key === "F" && (salaryTarget || salaryBaseline) && (
+                    <div className="text-xs grid gap-1">
+                      {salaryTarget && (
+                        <div>
+                          <span className="font-semibold">Target salary (median):</span>{" "}
+                          {salaryTarget.currency} {salaryTarget.median?.toLocaleString() ?? "—"}
+                          {salaryTarget.p25 && salaryTarget.p75
+                            ? `  (p25 ${salaryTarget.p25.toLocaleString()} • p75 ${salaryTarget.p75.toLocaleString()})`
+                            : ""}
+                          <span className="text-muted-foreground"> — {salaryTarget.source}</span>
+                        </div>
+                      )}
+                      {salaryBaseline && (
+                        <div>
+                          <span className="font-semibold">Baseline (median):</span>{" "}
+                          {salaryBaseline.currency} {salaryBaseline.median?.toLocaleString() ?? "—"}
+                          <span className="text-muted-foreground"> — {salaryBaseline.source}</span>
+                        </div>
+                      )}
+                      {salaryDelta && salaryDelta.medianDelta != null && (
+                        <div>
+                          <span className="font-semibold">Estimated delta:</span>{" "}
+                          {salaryDelta.currency} {salaryDelta.medianDelta.toLocaleString()}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                   {a.key === "F" && selectedJobId && citationsByJob[selectedJobId]?.length > 0 && (
+                    <div className="text-xs">
+                      <div className="font-semibold mb-1">Evidence from job description:</div>
+                      <div className="flex flex-wrap gap-2">
+                        {citationsByJob[selectedJobId].map((c, i) => (
+                          <TooltipShadcn key={`${c.skillId}-${i}`}>
+                            <TooltipTrigger asChild>
+                              <Badge variant="secondary">{c.name}</Badge>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs whitespace-pre-wrap">
+                              <p className="text-[11px] leading-snug">{c.snippet}</p>
+                            </TooltipContent>
+                          </TooltipShadcn>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                 </CardContent>
               </Card>
             );

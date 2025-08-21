@@ -229,3 +229,22 @@ model RoleClusterSkill {
   @@unique([cluster_id, skill_id])
   @@map("role_cluster_skill")
 }
+
+model SalaryBenchmark {
+  id        BigInt  @id @default(autoincrement())
+  role      String
+  level     String?
+  country   String?
+  region    String?
+  city      String?
+  currency  String   @default("USD")
+  p25       Int?
+  median    Int?
+  p75       Int?
+  source    String?  // "levels.fyi 2025-06 dump", etc.
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([role, level, country, region, city])
+  @@map("salary_benchmarks")
+}
