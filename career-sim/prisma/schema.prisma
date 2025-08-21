@@ -280,3 +280,14 @@ model Plan {
   @@index([user_id, created_at])
   @@map("plan")
 }
+
+model CalibrationModel {
+  id         BigInt   @id @default(autoincrement())
+  name       String   @unique       // e.g., "default"
+  // Simple logistic: p = σ(b0 + b1 * s_norm)
+  b0         Float
+  b1         Float
+  updated_at DateTime @updatedAt
+
+  @@map("CalibrationModel")
+}

@@ -90,6 +90,10 @@ const [{ d }] = await prisma.$queryRawUnsafe<any[]>(
   j.embedding
 );
 let runningScore = Math.max(0, Math.min(1, 1 - d)); // base similarity 0..1
+const calib = await prisma.calibrationModel.findUnique({ where: { name: "default" } });
+const b0 = calib?.b0 ?? -2.0;
+const b1 = calib?.b1 ?? 4.0;
+const toProb = (s01: number) => 1 / (1 + Math.exp(-(b0 + b1 * s01)));
 
 for (let week = 1; week <= weeks; week++) {
   let capacity = weeklyHours;
@@ -105,7 +109,13 @@ for (let week = 1; week <= weeks; week++) {
     }
   }
   runningScore = Math.min(runningScore + 0.02, 1.0); // small ambient gain from “practice”
-  steps.push({ week, score: Number((Math.min(runningScore, 1) * 100).toFixed(1)) });
+    const s01 = Math.min(Math.max(runningScore, 0), 1);
+    const prob = toProb(s01);
+    steps.push({
+    week,
+    score: Number((s01 * 100).toFixed(1)),           // keep for backward compat
+    prob: Number((prob * 100).toFixed(1))            // NEW: calibrated probability %
+    })
 }
 
   // store simulation

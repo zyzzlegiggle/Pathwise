@@ -54,7 +54,7 @@ type ResourceHit = {
   hours_estimate?: number;
   score?: number;
 };
-type SimStep = { week: number; score: number };
+type SimStep = { week: number; score: number;  prob?: number };
 
 // ---------- Agent Orchestrator Types ----------
 type AgentKey = "A" | "B" | "C" | "D" | "E" | "F";
@@ -1139,38 +1139,43 @@ const onRunF = () => {
           <div className="w-full h-64 rounded-lg border p-3">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
-                data={
-                  // merge data by week for tooltip alignment (uses the longest series)
-                  (multiSeries[0]?.steps || simSteps).map((row, idx) => {
-                    const base = { week: row.week, base: row.score };
-                    multiSeries.forEach((s, si) => {
-                      base.base = s.steps[idx]?.score ?? null;
-                    });
-                    return base;
-                  })
+              data={(multiSeries[0]?.steps || simSteps).map((row, idx) => {
+                const base: Record<string, any> = { 
+                  week: row.week, 
+                  score: row.score, 
+                  prob: row.prob 
                 }
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="week" />
-                <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
-                <Tooltip
-                  formatter={(val: any) => (val == null ? "—" : `${val}%`)}
-                  labelFormatter={(l) => `Week ${l}`}
-                />
-                {multiSeries.length > 0
-                  ? multiSeries.map((s, i) => (
-                      <Line
-                        key={s.label}
-                        type="monotone"
-                        dataKey={`s${i}`}
-                        name={s.label}
-                        dot
-                      />
-                    ))
-                  : (
-                      <Line type="monotone" dataKey="base" name="10h/wk" dot />
-                    )}
-              </LineChart>
+                multiSeries.forEach((s, si) => {
+                  base[`s${si}`] = s.steps[idx]?.score ?? null
+                })
+                return base
+              })}
+            >
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="week" />
+              <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
+              <Tooltip
+                formatter={(val: any) => (val == null ? "—" : `${val}%`)}
+                labelFormatter={(l) => `Week ${l}`}
+              />
+              {multiSeries.length > 0
+                ? multiSeries.map((s, i) => (
+                    <Line
+                      key={s.label}
+                      type="monotone"
+                      dataKey={`s${i}`}
+                      name={s.label}
+                      dot
+                    />
+                  ))
+                : (
+                  <>
+                    <Line type="monotone" dataKey="score" name="Match score" dot />
+                    <Line type="monotone" dataKey="prob"  name="Qualification probability" dot />
+                  </>
+                )}
+            </LineChart>
+
             </ResponsiveContainer>
           </div>
         </section>
