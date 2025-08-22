@@ -47,6 +47,8 @@ import { Switch } from "@/components/ui/switch";
 import { BadgeCheck, Play, FileDown, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils"; // if you have this helper
 import { ReferenceLine, Legend } from "recharts";
+import { AnimatePresence, motion } from "framer-motion";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 type JobResult = {
   id: string; // backend returns string; was number before (fix)
@@ -162,6 +164,26 @@ export default function HomePage() {
   const [weeklyHours, setWeeklyHours] = useState<number>(10);
   const [activeSeries, setActiveSeries] = useState<string[]>([]);   // which series are visible
   const [targetThreshold, setTargetThreshold] = useState<number>(75); // goal line on chart
+  const [activeTab, setActiveTab] = useState<"plan"|"profile"|"jobs"|"results"|"orchestrator">("plan");
+  const [jobsPage, setJobsPage] = useState(1);
+  const pageSize = 6;
+  const pagedJobs = useMemo(() => {
+    const start = (jobsPage - 1) * pageSize;
+    return jobs.slice(start, start + pageSize);
+  }, [jobs, jobsPage]);
+  const totalJobPages = Math.max(1, Math.ceil(jobs.length / pageSize));
+  useEffect(() => { if (jobs.length) setJobsPage(1); }, [jobs]);
+  // collapse/expand for job rows
+  const [openJobIds, setOpenJobIds] = useState<Record<string, boolean>>({});
+  const toggleJobRow = (id: string) =>
+    setOpenJobIds(prev => ({ ...prev, [id]: !prev[id] }));
+
+  // tiny fade/slide variants for smoother tab/content transitions
+  const fadeSlide = {
+    initial: { opacity: 0, y: 8 },
+    animate: { opacity: 1, y: 0, transition: { duration: 0.18 } },
+    exit: { opacity: 0, y: 8, transition: { duration: 0.12 } },
+  };
 
   useEffect(() => {
   if (multiSeries.length) {
@@ -210,23 +232,35 @@ export default function HomePage() {
   }
 
   async function fetchJobs() {
-    setLoading(true);
-    setMessage("Fetching jobs...");
-    try {
-      const params = new URLSearchParams({
-        role,
-        location,
-        remote: String(remoteOnly),
-      }).toString();
-      const res = await fetch(`/api/jobs?${params}`);
-      const data = await res.json();
-      setMessage(`Fetched ${data.count ?? 0} jobs`);
-    } catch {
-      setMessage("Error fetching jobs");
-    } finally {
-      setLoading(false);
+  setLoading(true);
+  setMessage("Fetching jobs...");
+  try {
+    const params = new URLSearchParams({
+      role,
+      location,
+      remote: String(remoteOnly),
+    }).toString();
+    const res = await fetch(`/api/jobs?${params}`);
+    const data = await res.json();
+
+    const list: JobResult[] = data.jobs || [];
+    setJobs(list);
+
+    // initialize selected job + citations for downstream agents
+    const firstId = list[0]?.id ?? null;
+    setSelectedJobId(firstId);
+    if (firstId) {
+      const top3 = list.slice(0, 3).map((j) => j.id);
+      setCitedJobIds(Array.from(new Set([firstId, ...top3])).slice(0, 5));
     }
+
+    setMessage(`Fetched ${data.count ?? list.length} jobs`);
+  } catch {
+    setMessage("Error fetching jobs");
+  } finally {
+    setLoading(false);
   }
+}
 
   async function findSimilar() {
     setLoading(true);
@@ -451,7 +485,7 @@ export default function HomePage() {
   // Agent C
   const onRunC = () => {
     const jid = selectedJobId || jobs[0]?.id;
-    if (!jid) return;
+    if (!jid) { setMessage("Select or fetch a target job before running Agent C."); return; }
     setAgents((s) => ({ ...s, C: { ...s.C, status: "running", log: [], progress: 0 } }));
     const es = onRunSSE({  agent: "C",
             userId: "1",
@@ -513,8 +547,7 @@ const onRunD = () => {
 // Agent E — multi-path (8/10/15 h/week overlay)
 const onRunE = () => {
   const jid = selectedJobId || jobs[0]?.id;
-  if (!jid) return;
-  setAgents((s) => ({ ...s, E: { ...s.E, status: "running", log: [], progress: 0 } }));
+  if (!jid) { setMessage("Select or fetch a target job before running Agent E."); return; }  setAgents((s) => ({ ...s, E: { ...s.E, status: "running", log: [], progress: 0 } }));
   setMultiSeries([]); // reset
   const es = onRunSSE({
     agent: "E",
@@ -562,7 +595,6 @@ const onRunF = () => {
   );
   es.addEventListener("payload", (e: any) => {
     const { citedJobs, salaryTarget, salaryBaseline, delta } = JSON.parse(e.data);
-    // build a short explanation that cites titles/urls from current jobs list
     const lookup = new Map(jobs.map((j) => [j.id, j]));
     const picked = citedJobs
       .map((id: string, i: number) => {
@@ -571,33 +603,40 @@ const onRunF = () => {
       })
       .filter(Boolean)
       .join("\n");
+
     const top = jobs.find((j) => j.id === (selectedJobId || jobs[0]?.id));
     const gaps = top ? (gapsByJob[top.id] || []) : [];
-    const summary =
-      [
-        `Top target: ${top ? `${top.title} @ ${top.company} (${top.location})` : "N/A"}`,
-        top ? `Current match score: ${(top.score * 100).toFixed(1)}%` : "",
-        gaps.length ? `Primary gaps: ${gaps.join(", ")}` : "No significant gaps detected.",
-        multiSeries.length
-          ? `Projected qualification after 12 weeks: ${multiSeries
-              .map((s) => `${s.label} → ${s.steps.at(-1)?.score ?? "—"}%`)
-              .join(" | ")}`
-          : simSteps.length
-          ? `Projected qualification in 12 weeks: ${simSteps.at(-1)?.score ?? "—"}%`
-          : "No simulation data yet.",
-        picked ? `Citations:\n${picked}` : "",
-      ]
-        .filter(Boolean)
-        .join("\n");
+    const summary = [
+      `Top target: ${top ? `${top.title} @ ${top.company} (${top.location})` : "N/A"}`,
+      top ? `Current match score: ${(top.score * 100).toFixed(1)}%` : "",
+      gaps.length ? `Primary gaps: ${gaps.join(", ")}` : "No significant gaps detected.",
+      multiSeries.length
+        ? `Projected qualification after 12 weeks: ${multiSeries
+            .map((s) => `${s.label} → ${s.steps.at(-1)?.score ?? "—"}%`)
+            .join(" | ")}`
+        : simSteps.length
+        ? `Projected qualification in 12 weeks: ${simSteps.at(-1)?.score ?? "—"}%`
+        : "No simulation data yet.",
+      picked ? `Citations:\n${picked}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    // Build evidence once and append to the summary, then set a SINGLE time.
+    let evidence = "";
     if (selectedJobId && citationsByJob[selectedJobId]?.length) {
-      const lines = citationsByJob[selectedJobId].slice(0, 6).map((c) => `• ${c.name}: “…${c.snippet.slice(0, 120)}…”`);
-      setExplanation((prev) => `${prev}\n\nEvidence:\n${lines.join("\n")}`);
+      const lines = citationsByJob[selectedJobId]
+        .slice(0, 6)
+        .map((c) => `• ${c.name}: “…${c.snippet.slice(0, 120)}…”`);
+      evidence = `\n\nEvidence:\n${lines.join("\n")}`;
     }
-    setExplanation(summary);
+    setExplanation(summary + evidence);
+
     setSalaryTarget(salaryTarget || null);
     setSalaryBaseline(salaryBaseline || null);
     setSalaryDelta(delta || null);
   });
+
   es.addEventListener("status", (e: any) => {
     const { status } = JSON.parse(e.data);
     setStatus("F", status as any);
@@ -627,7 +666,15 @@ const onRunF = () => {
       <div className="relative inline-flex items-center justify-center w-12 h-12 rounded-full"
         style={{ background: `conic-gradient(hsl(var(--primary)) ${pct*3.6}deg, hsl(var(--muted-foreground)) 0)` }}>
         <div className="absolute w-9 h-9 rounded-full bg-background border" />
-        <span className="text-xs font-semibold">{pct}%</span>
+        <motion.span
+          className="text-xs font-semibold"
+          key={pct}
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.15 }}
+        >
+          {pct}%
+        </motion.span>
       </div>
     );
   };
@@ -649,14 +696,155 @@ const onRunF = () => {
     </div>
   );
 
+  // Compact, expandable job row
+  const JobRow: React.FC<{ job: JobResult }> = ({ job }) => {
+    const isOpen = !!openJobIds[job.id];
+    return (
+      <Card key={job.id} className="shadow-sm">
+        <button
+          className="w-full text-left"
+          onClick={() => toggleJobRow(job.id)}
+          aria-expanded={isOpen}
+        >
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <div className="min-w-0">
+              <CardTitle className="text-base truncate">{job.title}</CardTitle>
+              <p className="text-sm text-muted-foreground truncate">
+                {job.company} • {job.location}
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <ScorePill score={job.score * 100} />
+              {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            </div>
+          </CardHeader>
+        </button>
+
+        <AnimatePresence initial={false}>
+          {isOpen && (
+            <motion.div {...fadeSlide}>
+              <CardContent className="space-y-3">
+                <div className="flex flex-wrap gap-3">
+                  {job.url && (
+                    <a href={job.url} target="_blank" rel="noreferrer" className="underline text-sm">
+                      View posting
+                    </a>
+                  )}
+                  <Button size="sm" variant="secondary" onClick={() => analyzeGaps(job.id)} disabled={loading}>
+                    Analyze gaps
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => simulate(job.id)} disabled={loading}>
+                    Simulate 12 weeks
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={selectedJobId === job.id ? "default" : "outline"}
+                    onClick={() => {
+                      setSelectedJobId(job.id);
+                      const top3 = jobs.slice(0, 3).map((j) => j.id);
+                      const citations = Array.from(new Set([job.id, ...top3])).slice(0, 5);
+                      setCitedJobIds(citations);
+                      setExplanation("");
+                    }}
+                  >
+                    Set target
+                  </Button>
+                </div>
+
+                {!gapsByJob[job.id]?.length && (
+                  <p className="text-xs text-muted-foreground">
+                    Tip: Run <span className="font-medium">Analyze gaps</span> to unlock tailored learning resources.
+                  </p>
+                )}
+
+                {gapsByJob[job.id]?.length ? (
+                  <Collapsible>
+                    <CollapsibleTrigger asChild>
+                      <Button size="sm" variant="ghost" className="px-0">
+                        Show missing skills ({gapsByJob[job.id].length})
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="mt-2 space-y-3">
+                      <div className="flex flex-wrap gap-2">
+                        {gapsByJob[job.id].map((skill) => (
+                          <Badge key={skill} variant="secondary" className="text-xs">
+                            {skill}
+                          </Badge>
+                        ))}
+                      </div>
+                      <div className="space-y-3">
+                        {gapsByJob[job.id].map((skill) =>
+                          resourcesBySkill[skill]?.length ? (
+                            <div key={`res-${skill}`} className="rounded-md border p-3">
+                              <p className="text-sm font-semibold mb-1">Resources for {skill}</p>
+                              <ul className="list-disc pl-5 space-y-1">
+                                {resourcesBySkill[skill].map((r, i) => (
+                                  <li key={`${skill}-${i}`} className="text-sm">
+                                    <a href={r.url} target="_blank" rel="noreferrer" className="underline">{r.title}</a>{" "}
+                                    <span className="text-muted-foreground">• {r.provider}{r.hours_estimate ? ` • ~${r.hours_estimate}h` : ""}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          ) : (
+                            <Button
+                              key={`btn-${skill}`}
+                              size="sm"
+                              variant="outline"
+                              onClick={() => fetchResources(skill)}
+                              disabled={loading}
+                            >
+                              Find {skill} resources
+                            </Button>
+                          )
+                        )}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                ) : null}
+              </CardContent>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </Card>
+    );
+  };
+
 
   return (
-    <main className="p-8 max-w-4xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold">Career Clone Demo</h1>
 
-      {/* Goals & Preferences */}
-      <section className="rounded-xl border p-4 mb-3">
-        <Tabs defaultValue="goal" className="w-full">
+<main className="max-w-5xl mx-auto">
+  {/* Sticky header with primary tabs */}
+  <div className="sticky top-0 z-30 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+    <div className="px-6 py-3 flex items-center justify-between">
+      <h1 className="text-xl font-semibold">Career Clone</h1>
+      <div className="hidden sm:flex items-center gap-2">
+        <Button size="sm" variant="secondary" onClick={saveGoals}>Save goals</Button>
+        <Button size="sm" onClick={runAll}><Play className="mr-1 h-4 w-4"/>Run pipeline</Button>
+      </div>
+    </div>
+    <div className="px-4 pb-2">
+      <Tabs value={activeTab} onValueChange={(v)=> setActiveTab(v as any)}>
+        <TabsList className="w-full grid grid-cols-5">
+          <TabsTrigger value="plan">Plan</TabsTrigger>
+          <TabsTrigger value="profile">Profile</TabsTrigger>
+          <TabsTrigger value="jobs">Openings</TabsTrigger>
+          <TabsTrigger value="results">Results</TabsTrigger>
+          <TabsTrigger value="orchestrator">Orchestrator</TabsTrigger>
+        </TabsList>
+      </Tabs>
+    </div>
+  </div>
+
+  {/* Tab content */}
+  <div className="p-6">
+    <AnimatePresence mode="wait">
+      {activeTab === "plan" && (
+        <motion.div key="tab-plan" {...fadeSlide} className="space-y-6">
+          <section className="rounded-xl border p-4">
+            <h3 className="text-sm font-semibold mb-3">Set your target</h3>
+            {/* ORIGINAL block: Goals & Preferences section (as in your code) */}
+          <Tabs defaultValue="goal" className="w-full">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold">Plan your target</h3>
             <div className="flex gap-2">
@@ -748,35 +936,297 @@ const onRunF = () => {
             </p>
           </TabsContent>
         </Tabs>
-      </section>
+          </section>
+        </motion.div>
+      )}
 
-
-      {/* Agent Orchestrator */}
-      <Dialog>
-        <DialogTrigger asChild>
-          <Button variant="outline">Open Agent Orchestrator</Button>
-        </DialogTrigger>
-        <DialogContent className="max-w-5xl w-[95vw]">
-          <DialogHeader className="flex flex-row items-center justify-between">
-            <DialogTitle>Agent Orchestrator</DialogTitle>
-            <div className="flex gap-2">
-              <Button variant="secondary" onClick={resetAgents}>Reset</Button>
-              <Button onClick={runAll}>Run all (A→F)</Button>
+      {activeTab === "profile" && (
+        <motion.div key="tab-profile" {...fadeSlide} className="space-y-6">
+          {/* Resume uploader + Profile */}
+          <section className="rounded-xl border p-4 space-y-3">
+            <h2 className="text-lg font-semibold">Your Profile</h2>
+            {/* Paste Resume (unchanged component) */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium">Paste resume (optional)</label>
+              {/* keep your Textarea + Upload button */}
+              <Textarea
+                value={resume}
+                onChange={(e: any) => setResume(e.target.value)}
+                placeholder="Paste resume text here..."
+                className="h-40"
+              />
+              <Button onClick={uploadResume} disabled={loading}>
+                Upload Resume
+              </Button>
             </div>
-          </DialogHeader>
-          <ScrollArea className="max-h-[80vh] pr-2">
-              <section className="rounded-xl border p-4 space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-muted-foreground">
-              Run each agent step-by-step or run the full pipeline.
-            </p>
+
+            <Separator className="my-3" />
+
+            <h2 className="text-lg font-semibold">Connect Profile</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-start">
+          <div className="sm:col-span-3 space-y-1">
+            <label className="block text-sm font-medium">LinkedIn URL</label>
+            <Input
+              value={linkedinUrl}
+              onChange={(e) => setLinkedinUrl(e.target.value)}
+              placeholder="https://www.linkedin.com/in/your-handle"
+              inputMode="url"
+            />
           </div>
-          
-          
+
+          <div className="space-y-1">
+            <label className="block text-sm font-medium">Years of experience</label>
+            <Input
+              type="number"
+              min={0}
+              max={50}
+              value={yearsExp}
+              onChange={(e) => setYearsExp(e.target.value === "" ? "" : Number(e.target.value))}
+              placeholder="e.g., 4"
+              className="w-28"
+            />
+          </div>
+
+          <div className="space-y-1 sm:col-span-2">
+            <label className="block text-sm font-medium">Stacks (comma separated)</label>
+            <Input
+              value={stackInput}
+              onChange={(e) => setStackInput(e.target.value)}
+              placeholder="Rust, Tokio, Go, gRPC, PostgreSQL"
+            />
+            <p className="text-xs text-muted-foreground">We’ll dedupe and normalize against the skill catalog.</p>
+          </div>
+
+          <div className="sm:col-span-3 space-y-1">
+            <label className="block text-sm font-medium">Education</label>
+            <Textarea
+              value={educationText}
+              onChange={(e) => setEducationText(e.target.value)}
+              placeholder="e.g., BSc in Computer Science, University of X (2019)"
+              className="h-20"
+            />
+          </div>
         </div>
 
-        <div className="grid gap-3">
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={saveProfile}>Save profile</Button>
+        </div>
+          </section>
+        </motion.div>
+      )}
+
+      {activeTab === "jobs" && (
+        <motion.div key="tab-jobs" {...fadeSlide} className="space-y-6">
+          {/* Job Finder controls */}
+          <section className="rounded-xl border p-4 space-y-3">
+            <h2 className="text-lg font-semibold">Find openings</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 items-end">
+          <div className="sm:col-span-2">
+            <Label className="text-sm">Role / Keyword</Label>
+            <Input value={role} onChange={(e)=> setRole(e.target.value)} placeholder="e.g., backend developer" />
+          </div>
+          <div className="sm:col-span-2">
+            <Label className="text-sm">Location</Label>
+            <Input value={location} onChange={(e)=> setLocation(e.target.value)} placeholder="e.g., Singapore" />
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch id="remoteOnly" checked={remoteOnly} onCheckedChange={(v)=> setRemoteOnly(Boolean(v))}/>
+            <Label htmlFor="remoteOnly" className="text-sm">Remote only</Label>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2 justify-end">
+          <Button onClick={fetchJobs} disabled={loading} variant="secondary">
+            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Fetch JSearch
+          </Button>
+          <Button onClick={findSimilar} disabled={loading} variant="outline">
+            Find Similar Jobs
+          </Button>
+        </div>
+          </section>
+
+          {message && (
+            <motion.div {...fadeSlide} className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
+              {message}
+            </motion.div>
+          )}
+
+          {/* Target job selector (compact) */}
+          {jobs.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="text-sm font-medium">Target job for C–F</label>
+            
+              <select
+            className="border rounded-md px-2 py-1 text-sm"
+            value={selectedJobId ?? jobs[0]?.id}
+            onChange={(e) => {
+              const id = e.target.value;
+              setSelectedJobId(id);
+              // keep 3 most-relevant job ids for potential citations
+              const top3 = jobs.slice(0, 3).map((j) => j.id);
+              // ensure selected is included
+              const citations = Array.from(new Set([id, ...top3])).slice(0, 5);
+              setCitedJobIds(citations);
+            }}
+          >
+            {jobs.map((j) => (
+              <option key={j.id} value={j.id}>
+                {j.title} @ {j.company} — {(j.score * 100).toFixed(1)}%
+              </option>
+            ))}
+              </select>
+            </div>
+          )}
+
+          {/* Job results — compact list with pagination */}
+          {!!jobs.length && (
+            <section className="space-y-3">
+              <div className="grid gap-3">
+                {pagedJobs.map((job) => <JobRow key={job.id} job={job} />)}
+              </div>
+
+              {totalJobPages > 1 && (
+                <div className="flex items-center justify-between pt-2">
+                  <p className="text-xs text-muted-foreground">
+                    Page {jobsPage} of {totalJobPages}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setJobsPage((p) => Math.max(1, p - 1))}
+                      disabled={jobsPage === 1}
+                    >
+                      Prev
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setJobsPage((p) => Math.min(totalJobPages, p + 1))}
+                      disabled={jobsPage === totalJobPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
+        </motion.div>
+      )}
+
+      {activeTab === "results" && (
+        <motion.div key="tab-results" {...fadeSlide} className="space-y-6">
+          {/* Simulation chart + controls (move your whole simulation section here) */}
+          {(multiSeries.length > 0 || simSteps.length > 0) ? (
+            <section className="space-y-3">
+              {/* keep your existing HoursSlider + Re-simulate + chart */}
+              <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">
+              Simulation — Qualification vs Weeks {selectedJobId ? `(Job #${selectedJobId})` : ""}
+            </h2>
+            <div className="flex items-center gap-3">
+              <HoursSlider value={weeklyHours} onChange={(v)=> setWeeklyHours(v)} />
+              <Button
+                size="sm"
+                onClick={() => {
+                  // re-run E with hours variants around selection for comparison
+                  setSelectedPathIds((p) => p.slice(0, 3));
+                  onRunE();
+                }}
+              >
+                Re-simulate
+              </Button>
+            </div>
+          </div>
+
+          {/* Series toggles */}
+          <div className="flex flex-wrap gap-2">
+            {(multiSeries.length ? multiSeries.map(s => s.label) : ["Match score","Qualification probability"]).map((label) => {
+              const on = activeSeries.includes(label);
+              return (
+                <Button
+                  key={label}
+                  size="sm"
+                  variant={on ? "default" : "outline"}
+                  onClick={() =>
+                    setActiveSeries((prev) =>
+                      prev.includes(label) ? prev.filter((l) => l !== label) : [...prev, label]
+                    )
+                  }
+                >
+                  {on ? <BadgeCheck className="mr-1 h-4 w-4" /> : null}
+                  {label}
+                </Button>
+              );
+            })}
+          </div>
+
+          <div className="w-full h-72 rounded-lg border p-3">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart
+                data={(multiSeries[0]?.steps || simSteps).map((row, idx) => {
+                  const base: Record<string, any> = { week: row.week, score: row.score, prob: row.prob };
+                  multiSeries.forEach((s, si) => { base[s.label] = s.steps[idx]?.score ?? null; });
+                  return base;
+                })}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="week" />
+                <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
+                <Tooltip formatter={(val: any, name: string) => (val == null ? "—" : `${val}%`)} labelFormatter={(l) => `Week ${l}`} />
+                <Legend />
+                {/* goal line */}
+                <ReferenceLine y={targetThreshold} strokeDasharray="4 4" label={`${targetThreshold}% target`} />
+                {/* draw lines only if enabled */}
+                {multiSeries.length > 0 ? (
+                  multiSeries.map((s) =>
+                    activeSeries.includes(s.label) ? (
+                      <Line key={s.label} type="monotone" dataKey={s.label} name={s.label} dot />
+                    ) : null
+                  )
+                ) : (
+                  <>
+                    {activeSeries.includes("Match score") && (
+                      <Line type="monotone" dataKey="score" name="Match score" dot />
+                    )}
+                    {activeSeries.includes("Qualification probability") && (
+                      <Line type="monotone" dataKey="prob" name="Qualification probability" dot />
+                    )}
+                  </>
+                )}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            The dashed line marks your target qualification ({targetThreshold}%). Toggle series to compare scenarios.
+          </p>
+
+            </section>
+          ) : (
+            <Card className="p-6">
+              <p className="text-sm text-muted-foreground">
+                Run a simulation from the Jobs tab to see projected qualification over time.
+              </p>
+            </Card>
+          )}
+        </motion.div>
+      )}
+
+      {activeTab === "orchestrator" && (
+        <motion.div key="tab-orchestrator" {...fadeSlide} className="space-y-6">
+          {/* Inline Orchestrator: convert Dialog to inline card for tab view */}
+          <section className="rounded-xl border">
+            <div className="p-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Agent Orchestrator</h2>
+              <div className="flex gap-2">
+                <Button variant="secondary" onClick={resetAgents}>Reset</Button>
+                <Button onClick={runAll}>Run all (A→F)</Button>
+              </div>
+            </div>
+            <Separator />
+            <ScrollArea className="max-h-[70vh] p-4">
+<div className="grid gap-3">
           {AGENTS.map((a) => {
             const s = agents[a.key];
             return (
@@ -974,323 +1424,16 @@ const onRunF = () => {
             );
           })}
         </div>
-      </section>
-          </ScrollArea>
-          
-
-          
-        </DialogContent>
-      </Dialog>
-      
-
-      {/* Resume uploader */}
-      <section className="space-y-2">
-        <label className="block font-medium">Paste Resume</label>
-        <Textarea
-          value={resume}
-          onChange={(e: any) => setResume(e.target.value)}
-          placeholder="Paste resume text here..."
-          className="h-40"
-        />
-        <Button onClick={uploadResume} disabled={loading}>
-          Upload Resume
-        </Button>
-      </section>
-
-      {/* Ingestion — LinkedIn + Short Form */}
-      <section className="rounded-xl border p-4 space-y-3">
-        <h2 className="text-lg font-semibold">Connect Profile</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-start">
-          <div className="sm:col-span-3 space-y-1">
-            <label className="block text-sm font-medium">LinkedIn URL</label>
-            <Input
-              value={linkedinUrl}
-              onChange={(e) => setLinkedinUrl(e.target.value)}
-              placeholder="https://www.linkedin.com/in/your-handle"
-              inputMode="url"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="block text-sm font-medium">Years of experience</label>
-            <Input
-              type="number"
-              min={0}
-              max={50}
-              value={yearsExp}
-              onChange={(e) => setYearsExp(e.target.value === "" ? "" : Number(e.target.value))}
-              placeholder="e.g., 4"
-              className="w-28"
-            />
-          </div>
-
-          <div className="space-y-1 sm:col-span-2">
-            <label className="block text-sm font-medium">Stacks (comma separated)</label>
-            <Input
-              value={stackInput}
-              onChange={(e) => setStackInput(e.target.value)}
-              placeholder="Rust, Tokio, Go, gRPC, PostgreSQL"
-            />
-            <p className="text-xs text-muted-foreground">We’ll dedupe and normalize against the skill catalog.</p>
-          </div>
-
-          <div className="sm:col-span-3 space-y-1">
-            <label className="block text-sm font-medium">Education</label>
-            <Textarea
-              value={educationText}
-              onChange={(e) => setEducationText(e.target.value)}
-              placeholder="e.g., BSc in Computer Science, University of X (2019)"
-              className="h-20"
-            />
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={saveProfile}>Save profile</Button>
-        </div>
-      </section>
-
-
-      {/* Job Finder */}
-      <section className="rounded-xl border p-4 space-y-3">
-        <h2 className="text-lg font-semibold">Find target openings</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 items-end">
-          <div className="sm:col-span-2">
-            <Label className="text-sm">Role / Keyword</Label>
-            <Input value={role} onChange={(e)=> setRole(e.target.value)} placeholder="e.g., backend developer" />
-          </div>
-          <div className="sm:col-span-2">
-            <Label className="text-sm">Location</Label>
-            <Input value={location} onChange={(e)=> setLocation(e.target.value)} placeholder="e.g., Singapore" />
-          </div>
-          <div className="flex items-center gap-2">
-            <Switch id="remoteOnly" checked={remoteOnly} onCheckedChange={(v)=> setRemoteOnly(Boolean(v))}/>
-            <Label htmlFor="remoteOnly" className="text-sm">Remote only</Label>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2 justify-end">
-          <Button onClick={fetchJobs} disabled={loading} variant="secondary">
-            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Fetch JSearch
-          </Button>
-          <Button onClick={findSimilar} disabled={loading} variant="outline">
-            Find Similar Jobs
-          </Button>
-        </div>
-      </section>
-
-
-      {message && (
-        <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
-          {message}
-        </div>
+            </ScrollArea>
+          </section>
+        </motion.div>
       )}
+    </AnimatePresence>
+  </div>
+</main>
 
-      {jobs.length > 0 && (
-        <div className="flex items-center gap-2">
-          <label className="text-sm font-medium">Target job for C–F</label>
-          <select
-            className="border rounded-md px-2 py-1 text-sm"
-            value={selectedJobId ?? jobs[0]?.id}
-            onChange={(e) => {
-              const id = e.target.value;
-              setSelectedJobId(id);
-              // keep 3 most-relevant job ids for potential citations
-              const top3 = jobs.slice(0, 3).map((j) => j.id);
-              // ensure selected is included
-              const citations = Array.from(new Set([id, ...top3])).slice(0, 5);
-              setCitedJobIds(citations);
-            }}
-          >
-            {jobs.map((j) => (
-              <option key={j.id} value={j.id}>
-                {j.title} @ {j.company} — {(j.score * 100).toFixed(1)}%
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      {/* Job results */}
-      <div className="grid gap-4 mt-6">
-        {jobs.map((job) => (
-          <Card key={job.id} className="shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <div>
-                <CardTitle className="text-base">{job.title}</CardTitle>
-                <p className="text-sm text-muted-foreground">{job.company} • {job.location}</p>
-              </div>
-              <div className="flex items-center gap-3">
-                <ScorePill score={job.score * 100} />
-                <Button
-                  size="sm"
-                  variant={selectedJobId === job.id ? "default" : "outline"}
-                  onClick={() => {
-                    setSelectedJobId(job.id);
-                    const top3 = jobs.slice(0, 3).map((j) => j.id);
-                    setCitedJobIds(Array.from(new Set([job.id, ...top3])).slice(0, 5));
-                  }}
-                >
-                  Set Target
-                </Button>
-              </div>
-            </CardHeader>
-
-            <CardContent className="space-y-3">
-              <div className="flex flex-wrap gap-3">
-                {job.url && (
-                  <a href={job.url} target="_blank" rel="noreferrer" className="underline text-sm">
-                    View posting
-                  </a>
-                )}
-                <Button size="sm" variant="secondary" onClick={() => analyzeGaps(job.id)} disabled={loading}>
-                  Analyze gaps
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => simulate(job.id)} disabled={loading}>
-                  Simulate 12 weeks
-                </Button>
-              </div>
-
-              {/* Missing skills + resources */}
-              {gapsByJob[job.id]?.length ? (
-                <Collapsible>
-                  <CollapsibleTrigger asChild>
-                    <Button size="sm" variant="ghost" className="px-0">
-                      Show missing skills ({gapsByJob[job.id].length})
-                    </Button>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="mt-2 space-y-3">
-                    <div className="flex flex-wrap gap-2">
-                      {gapsByJob[job.id].map((skill) => (
-                        <Badge key={skill} variant="secondary" className="text-xs">
-                          {skill}
-                        </Badge>
-                      ))}
-                    </div>
-                    {/* resources rows */}
-                    <div className="space-y-3">
-                      {gapsByJob[job.id].map((skill) =>
-                        resourcesBySkill[skill]?.length ? (
-                          <div key={`res-${skill}`} className="rounded-md border p-3">
-                            <p className="text-sm font-semibold mb-1">Resources for {skill}</p>
-                            <ul className="list-disc pl-5 space-y-1">
-                              {resourcesBySkill[skill].map((r, i) => (
-                                <li key={`${skill}-${i}`} className="text-sm">
-                                  <a href={r.url} target="_blank" rel="noreferrer" className="underline">{r.title}</a>{" "}
-                                  <span className="text-muted-foreground">• {r.provider}{r.hours_estimate ? ` • ~${r.hours_estimate}h` : ""}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        ) : (
-                          <Button
-                            key={`btn-${skill}`}
-                            size="sm"
-                            variant="outline"
-                            onClick={() => fetchResources(skill)}
-                            disabled={loading}
-                          >
-                            Find {skill} resources
-                          </Button>
-                        )
-                      )}
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
-              ) : null}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-
-      {/* simulation chart with multi-path overlay */}
-      {(multiSeries.length > 0 || simSteps.length > 0) && (
-        <section className="mt-10 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">
-              Simulation — Qualification vs Weeks {selectedJobId ? `(Job #${selectedJobId})` : ""}
-            </h2>
-            <div className="flex items-center gap-3">
-              <HoursSlider value={weeklyHours} onChange={(v)=> setWeeklyHours(v)} />
-              <Button
-                size="sm"
-                onClick={() => {
-                  // re-run E with hours variants around selection for comparison
-                  setSelectedPathIds((p) => p.slice(0, 3));
-                  onRunE();
-                }}
-              >
-                Re-simulate
-              </Button>
-            </div>
-          </div>
-
-          {/* Series toggles */}
-          <div className="flex flex-wrap gap-2">
-            {(multiSeries.length ? multiSeries.map(s => s.label) : ["Match score","Qualification probability"]).map((label) => {
-              const on = activeSeries.includes(label);
-              return (
-                <Button
-                  key={label}
-                  size="sm"
-                  variant={on ? "default" : "outline"}
-                  onClick={() =>
-                    setActiveSeries((prev) =>
-                      prev.includes(label) ? prev.filter((l) => l !== label) : [...prev, label]
-                    )
-                  }
-                >
-                  {on ? <BadgeCheck className="mr-1 h-4 w-4" /> : null}
-                  {label}
-                </Button>
-              );
-            })}
-          </div>
-
-          <div className="w-full h-72 rounded-lg border p-3">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart
-                data={(multiSeries[0]?.steps || simSteps).map((row, idx) => {
-                  const base: Record<string, any> = { week: row.week, score: row.score, prob: row.prob };
-                  multiSeries.forEach((s, si) => { base[s.label] = s.steps[idx]?.score ?? null; });
-                  return base;
-                })}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="week" />
-                <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
-                <Tooltip formatter={(val: any, name: string) => (val == null ? "—" : `${val}%`)} labelFormatter={(l) => `Week ${l}`} />
-                <Legend />
-                {/* goal line */}
-                <ReferenceLine y={targetThreshold} strokeDasharray="4 4" />
-
-                {/* draw lines only if enabled */}
-                {multiSeries.length > 0 ? (
-                  multiSeries.map((s) =>
-                    activeSeries.includes(s.label) ? (
-                      <Line key={s.label} type="monotone" dataKey={s.label} name={s.label} dot />
-                    ) : null
-                  )
-                ) : (
-                  <>
-                    {activeSeries.includes("Match score") && (
-                      <Line type="monotone" dataKey="score" name="Match score" dot />
-                    )}
-                    {activeSeries.includes("Qualification probability") && (
-                      <Line type="monotone" dataKey="prob" name="Qualification probability" dot />
-                    )}
-                  </>
-                )}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            The dashed line marks your target qualification ({targetThreshold}%). Toggle series to compare scenarios.
-          </p>
-        </section>
-      )}
-
-    </main>
   );
 }
+
+
+
