@@ -1014,7 +1014,7 @@ const onRunF = () => {
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <Label className="text-sm">Weekly learning hours</Label>
-        <span className="text-xs text-muted-foreground">{value}h/wk</span>
+        <span className="text-[11px]  text-muted-foreground">{value}h/wk</span>
       </div>
       <Slider
         value={[value]}
@@ -1030,1112 +1030,1194 @@ const onRunF = () => {
   const JobRow: React.FC<{ job: JobResult }> = ({ job }) => {
     const isOpen = !!openJobIds[job.id];
     return (
-      <Card key={job.id} className="shadow-sm">
+      <div className="border rounded-xl p-3">
         <button
           className="w-full text-left"
           onClick={() => toggleJobRow(job.id)}
           aria-expanded={isOpen}
         >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <div className="flex items-center justify-between">
             <div className="min-w-0">
-              <CardTitle className="text-base truncate">{job.title}</CardTitle>
-              <p className="text-sm text-muted-foreground truncate">
+              <div className="text-sm font-medium truncate">{job.title}</div>
+              <div className="text-[11px]  text-muted-foreground truncate">
                 {job.company} • {job.location}
-              </p>
+              </div>
             </div>
             <div className="flex items-center gap-3">
               <ScorePill score={job.score * 100} />
               {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
             </div>
-          </CardHeader>
+          </div>
         </button>
 
         <AnimatePresence initial={false}>
           {isOpen && (
-            <motion.div {...fadeSlide}>
-              <CardContent className="space-y-3">
-                <div className="flex flex-wrap gap-3">
-                  {job.url && (
-                    <a href={job.url} target="_blank" rel="noreferrer" className="underline text-sm">
-                      View posting
-                    </a>
-                  )}
-                  <Button size="sm" variant="secondary" onClick={() => analyzeGaps(job.id)} disabled={loading}>
-                    Analyze gaps
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => simulate(job.id)} disabled={loading}>
-                    Simulate 12 weeks
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={selectedJobId === job.id ? "default" : "outline"}
-                    onClick={() => {
-                      setSelectedJobId(job.id);
-                      const top3 = jobs.slice(0, 3).map((j) => j.id);
-                      const citations = Array.from(new Set([job.id, ...top3])).slice(0, 5);
-                      setCitedJobIds(citations);
-                      setExplanation("");
-                    }}
-                  >
-                    Set target
-                  </Button>
-                </div>
-
-                {!gapsByJob[job.id]?.length && (
-                  <p className="text-xs text-muted-foreground">
-                    Tip: Run <span className="font-medium">Analyze gaps</span> to unlock tailored learning resources.
-                  </p>
+            <motion.div {...fadeSlide} className="mt-3 space-y-3">
+              <div className="flex flex-wrap gap-2">
+                {job.url && (
+                  <a href={job.url} target="_blank" rel="noreferrer" className="underline text-xs">
+                    View posting
+                  </a>
                 )}
+                <Button size="xs" variant="secondary" onClick={() => analyzeGaps(job.id)} disabled={loading}>
+                  Analyze gaps
+                </Button>
+                <Button size="xs" variant="outline" onClick={() => simulate(job.id)} disabled={loading}>
+                  Simulate
+                </Button>
+                <Button
+                  size="xs"
+                  variant={selectedJobId === job.id ? "default" : "outline"}
+                  onClick={() => {
+                    setSelectedJobId(job.id);
+                    const top3 = jobs.slice(0, 3).map((j) => j.id);
+                    setCitedJobIds(Array.from(new Set([job.id, ...top3])).slice(0, 5));
+                    setExplanation("");
+                  }}
+                >
+                  Set target
+                </Button>
+              </div>
 
-                {gapsByJob[job.id]?.length ? (
-                  <Collapsible>
-                    <CollapsibleTrigger asChild>
-                      <Button size="sm" variant="ghost" className="px-0">
-                        Show missing skills ({gapsByJob[job.id].length})
-                      </Button>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="mt-2 space-y-3">
-                      <div className="flex flex-wrap gap-2">
-                        {gapsByJob[job.id].map((skill) => (
-                          <Badge key={skill} variant="secondary" className="text-xs">
-                            {skill}
-                          </Badge>
-                        ))}
-                      </div>
-                      <div className="space-y-3">
-                        {gapsByJob[job.id].map((skill) =>
-                          resourcesBySkill[skill]?.length ? (
-                            <div key={`res-${skill}`} className="rounded-md border p-3">
-                              <p className="text-sm font-semibold mb-1">Resources for {skill}</p>
-                              <ul className="list-disc pl-5 space-y-1">
-                                {resourcesBySkill[skill].map((r, i) => (
-                                  <li key={`${skill}-${i}`} className="text-sm">
-                                    <a href={r.url} target="_blank" rel="noreferrer" className="underline">{r.title}</a>{" "}
-                                    <span className="text-muted-foreground">• {r.provider}{r.hours_estimate ? ` • ~${r.hours_estimate}h` : ""}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          ) : (
-                            <Button
-                              key={`btn-${skill}`}
-                              size="sm"
-                              variant="outline"
-                              onClick={() => fetchResources(skill)}
-                              disabled={loading}
-                            >
-                              Find {skill} resources
-                            </Button>
-                          )
-                        )}
-                      </div>
-                    </CollapsibleContent>
-                  </Collapsible>
-                ) : null}
-              </CardContent>
+              {(!gapsByJob[job.id]?.length) && (
+                <p className="text-[11px] text-muted-foreground">
+                  Tip: run <span className="font-medium">Analyze gaps</span> to unlock resources.
+                </p>
+              )}
+
+              {gapsByJob[job.id]?.length ? (
+                <div className="space-y-2">
+                  <div className="flex flex-wrap gap-1">
+                    {gapsByJob[job.id].map((skill) => (
+                      <Badge key={skill} variant="secondary" className="text-[11px]">{skill}</Badge>
+                    ))}
+                  </div>
+
+                  {/* keep your resources block, but tighten paddings */}
+                  <div className="space-y-2">
+                    {gapsByJob[job.id].map((skill) =>
+                      resourcesBySkill[skill]?.length ? (
+                        <div key={`res-${skill}`} className="rounded-lg border p-2">
+                          <div className="text-xs font-medium mb-1">Resources for {skill}</div>
+                          <ul className="list-disc pl-4 space-y-1">
+                            {resourcesBySkill[skill].map((r, i) => (
+                              <li key={`${skill}-${i}`} className="text-xs">
+                                <a href={r.url} target="_blank" rel="noreferrer" className="underline">{r.title}</a>{" "}
+                                <span className="text-muted-foreground">
+                                  • {r.provider}{r.hours_estimate ? ` • ~${r.hours_estimate}h` : ""}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : (
+                        <Button
+                          key={`btn-${skill}`}
+                          size="xs"
+                          variant="outline"
+                          onClick={() => fetchResources(skill)}
+                          disabled={loading}
+                        >
+                          Find {skill} resources
+                        </Button>
+                      )
+                    )}
+                  </div>
+                </div>
+              ) : null}
             </motion.div>
           )}
         </AnimatePresence>
-      </Card>
+      </div>
+    );
+
+  };
+
+  // Alightweight dashboard shell + sidebar nav
+  const SidebarNav = ({
+    active,
+    onChange,
+  }: {
+    active: string;
+    onChange: (v: any) => void;
+  }) => {
+    const items: Array<{ key: typeof active; label: string; icon?: React.ReactNode }> = [
+      { key: "plan", label: "Plan" },
+      { key: "profile", label: "Profile" },
+      { key: "jobs", label: "Openings" },
+      { key: "results", label: "Results" },
+      { key: "orchestrator", label: "Orchestrator" },
+    ];
+    return (
+      <nav className="p-3 space-y-1">
+        {items.map((i) => (
+          <button
+            key={i.key}
+            onClick={() => onChange(i.key as any)}
+            className={[
+              "w-full text-left px-3 py-2 rounded-lg text-sm transition",
+              active === i.key
+                ? "bg-primary/10 text-primary"
+                : "hover:bg-muted text-muted-foreground",
+            ].join(" ")}
+            aria-current={active === i.key ? "page" : undefined}
+          >
+            {i.label}
+          </button>
+        ))}
+      </nav>
     );
   };
 
+  const DashboardShell: React.FC<{ title?: string; actions?: React.ReactNode; children: React.ReactNode }> = ({ title="Career Clone", actions, children }) => (
+    <div className="mx-auto max-w-6xl">
+      {/* header */}
+      <header className="sticky top-0 z-30 bg-background/80 backdrop-blur border-b">
+        <div className="px-5 py-3 flex items-center justify-between">
+          <h1 className="text-base font-semibold tracking-tight">{title}</h1>
+          <div className="flex items-center gap-2">{actions}</div>
+        </div>
+      </header>
 
-  return (
-
-<main className="max-w-5xl mx-auto">
-  {/* Sticky header with primary tabs */}
-  <div className="sticky top-0 z-30 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
-    <div className="px-6 py-3 flex items-center justify-between">
-      <h1 className="text-xl font-semibold">Career Clone</h1>
-      <div className="hidden sm:flex items-center gap-2">
-        <Button size="sm" variant="secondary" onClick={saveGoals}>Save goals</Button>
-        <Button size="sm" onClick={runAll}><Play className="mr-1 h-4 w-4"/>Run pipeline</Button>
+      {/* body with sidebar */}
+      <div className="grid grid-cols-12 gap-0">
+        <aside className="col-span-12 md:col-span-3 lg:col-span-2 border-r min-h-[calc(100vh-49px)]">
+          {/* you’ll wire activeTab into here */}
+          {/* placeholder; actual usage below in the main return */}
+        </aside>
+        <section className="col-span-12 md:col-span-9 lg:col-span-10 p-5">{children}</section>
       </div>
     </div>
-    <div className="px-4 pb-2">
-      <Tabs value={activeTab} onValueChange={(v)=> setActiveTab(v as any)}>
-        <TabsList className="w-full grid grid-cols-5">
-          <TabsTrigger value="plan">Plan</TabsTrigger>
-          <TabsTrigger value="profile">Profile</TabsTrigger>
-          <TabsTrigger value="jobs">Openings</TabsTrigger>
-          <TabsTrigger value="results">Results</TabsTrigger>
-          <TabsTrigger value="orchestrator">Orchestrator</TabsTrigger>
-        </TabsList>
-      </Tabs>
+  );
+
+  // compact KPI strip (stat cards)
+  const KPICard = ({ label, value, hint }: { label: string; value: React.ReactNode; hint?: string }) => (
+    <div className="rounded-xl border p-3">
+      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="text-sm font-semibold">{value}</div>
+      {hint ? <div className="text-[11px]  text-muted-foreground">{hint}</div> : null}
     </div>
-  </div>
+  );
 
-  {/* Tab content */}
-  <div className="p-6">
-    <AnimatePresence mode="wait">
-      {activeTab === "plan" && (
-        <motion.div key="tab-plan" {...fadeSlide} className="space-y-6">
-          <section className="rounded-xl border p-4">
-            <h3 className="text-sm font-semibold mb-3">Set your target</h3>
-            {/* ORIGINAL block: Goals & Preferences section (as in your code) */}
-          <Tabs defaultValue="goal" className="w-full">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold">Plan your target</h3>
-            <div className="flex gap-2">
-              <Button variant="secondary" onClick={saveGoals} size="sm">Save goals</Button>
-              <Button onClick={runAll} size="sm"><Play className="mr-1 h-4 w-4"/>Run pipeline</Button>
-            </div>
-          </div>
+  // empty state
+  const EmptyState = ({ title, hint }: { title: string; hint?: string }) => (
+    <div className="rounded-xl border p-8 text-center">
+      <div className="text-sm font-medium">{title}</div>
+      {hint ? <div className="text-[11px]  text-muted-foreground mt-1">{hint}</div> : null}
+    </div>
+  );
 
-          <TabsList className="grid grid-cols-3 w-full">
-            <TabsTrigger value="goal">Goal</TabsTrigger>
-            <TabsTrigger value="prefs">Preferences</TabsTrigger>
-            <TabsTrigger value="runtime">Simulation</TabsTrigger>
-          </TabsList>
 
-          <TabsContent value="goal" className="mt-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="sm:col-span-2">
-                <Label className="text-sm">Target role</Label>
-                <Input
-                  value={goalRole}
-                  onChange={(e) => setGoalRole(e.target.value)}
-                  placeholder="e.g., Backend SWE"
-                  className="mt-1"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-sm">Timeframe (months)</Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="number" min={1}
-                    value={goalMonths[0]}
-                    onChange={(e)=> setGoalMonths([Number(e.target.value), goalMonths[1]])}
-                    className="w-24"
-                  />
-                  <span className="text-sm text-muted-foreground">to</span>
-                  <Input
-                    type="number" min={goalMonths[0]}
-                    value={goalMonths[1]}
-                    onChange={(e)=> setGoalMonths([goalMonths[0], Number(e.target.value)])}
-                    className="w-24"
-                  />
+  return (
+    <main>
+  <DashboardShell
+    actions={
+      <>
+        <Button size="sm" variant="secondary" onClick={saveGoals}>Save goals</Button>
+        <Button size="sm" onClick={runAll}><Play className="mr-1 h-4 w-4"/>Run pipeline</Button>
+      </>
+    }
+  >
+    {/* inject sidebar nav that controls activeTab */}
+    <div className="grid grid-cols-12 gap-0">
+      <aside className="col-span-12 md:col-span-3 lg:col-span-2 border-r">
+        <SidebarNav active={activeTab} onChange={(v)=> setActiveTab(v as any)} />
+      </aside>
+
+      <section className="col-span-12 md:col-span-9 lg:col-span-10 space-y-6">
+        {/* KPI strip – small, glanceable */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <KPICard label="Openings" value={jobs.length || "—"} hint="from JSearch / similar" />
+          <KPICard label="Target hours" value={`${weeklyHours} h/wk`} hint="simulation input" />
+          <KPICard label="Qualification target" value={`${targetThreshold}%`} />
+          <KPICard
+            label="Selected job"
+            value={selectedJobId ? "Set" : "Not set"}
+            hint={selectedJobId ? undefined : "Pick in Openings"}
+          />
+        </div>
+
+        <AnimatePresence mode="wait">
+          {activeTab === "plan" && (
+            <motion.div key="tab-plan" {...fadeSlide} className="space-y-6">
+              <section className="rounded-xl border p-4">
+              <div className="flex items-center justify-between mb-2">
+                  <h2 className="text-sm font-semibold">Plan</h2>
+                  <div className="flex gap-2">
+                    <Button variant="secondary" onClick={saveGoals} size="sm">Save</Button>
+                    <Button onClick={runAll} size="sm"><Play className="mr-1 h-4 w-4"/>Run</Button>
+                  </div>
                 </div>
-              </div>
-            </div>
-          </TabsContent>
+              <Tabs defaultValue="goal" className="w-full">
 
-          <TabsContent value="prefs" className="mt-4">
-            <Label className="text-sm">Tech focus</Label>
-            <div className="flex flex-wrap gap-2 mt-2">
-              {["Rust","Go","Java","Python","LLM apps","Data Eng","MLOps"].map((t) => {
-                const on = stackPrefs.includes(t);
-                return (
-                  <Button
-                    key={t}
-                    type="button"
-                    size="sm"
-                    variant={on ? "default" : "outline"}
-                    onClick={() =>
-                      setStackPrefs((prev) => (on ? prev.filter((x) => x !== t) : [...prev, t]))
-                    }
-                  >
-                    {t}
-                  </Button>
-                );
-              })}
-            </div>
-            <Separator className="my-3" />
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
-              <div className="sm:col-span-2">
-                <Label className="text-sm">Decisions to compare</Label>
+              <TabsList className="grid grid-cols-3 w-full text-xs">
+                <TabsTrigger value="goal">Goal</TabsTrigger>
+                <TabsTrigger value="prefs">Prefs</TabsTrigger>
+                <TabsTrigger value="runtime">Sim</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="goal" className="mt-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="sm:col-span-2">
+                    <Label className="text-sm">Target role</Label>
+                    <Input
+                      value={goalRole}
+                      onChange={(e) => setGoalRole(e.target.value)}
+                      placeholder="e.g., Backend SWE"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm">Timeframe (months)</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number" min={1}
+                        value={goalMonths[0]}
+                        onChange={(e)=> setGoalMonths([Number(e.target.value), goalMonths[1]])}
+                        className="w-24"
+                      />
+                      <span className="text-sm text-muted-foreground">to</span>
+                      <Input
+                        type="number" min={goalMonths[0]}
+                        value={goalMonths[1]}
+                        onChange={(e)=> setGoalMonths([goalMonths[0], Number(e.target.value)])}
+                        className="w-24"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="prefs" className="mt-4">
+                <Label className="text-sm">Tech focus</Label>
                 <div className="flex flex-wrap gap-2 mt-2">
-                  {decisions.map((d) => {
-                    const on = selectedDecisionIds.includes(d.id);
+                  {["Rust","Go","Java","Python","LLM apps","Data Eng","MLOps"].map((t) => {
+                    const on = stackPrefs.includes(t);
                     return (
                       <Button
-                        key={d.id}
+                        key={t}
                         type="button"
                         size="sm"
                         variant={on ? "default" : "outline"}
                         onClick={() =>
-                          setSelectedDecisionIds((prev) =>
-                            on ? prev.filter((x) => x !== d.id) : [...prev, d.id].slice(0, 3)
-                          )
+                          setStackPrefs((prev) => (on ? prev.filter((x) => x !== t) : [...prev, t]))
                         }
-                        title={d.description}
                       >
-                        {d.label}
+                        {t}
                       </Button>
                     );
                   })}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">Pick up to 3.</p>
-              </div>
+                <Separator className="my-3" />
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
+                  <div className="sm:col-span-2">
+                    <Label className="text-sm">Decisions to compare</Label>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {decisions.map((d) => {
+                        const on = selectedDecisionIds.includes(d.id);
+                        return (
+                          <Button
+                            key={d.id}
+                            type="button"
+                            size="sm"
+                            variant={on ? "default" : "outline"}
+                            onClick={() =>
+                              setSelectedDecisionIds((prev) =>
+                                on ? prev.filter((x) => x !== d.id) : [...prev, d.id].slice(0, 3)
+                              )
+                            }
+                            title={d.description}
+                          >
+                            {d.label}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[11px]  text-muted-foreground mt-1">Pick up to 3.</p>
+                  </div>
 
-              <div>
-                <Label className="text-sm">Risk tolerance</Label>
-                <div className="mt-2">
-                  <Slider
-                    value={[riskTolerance]}
-                    min={1}
-                    max={3}
-                    step={1}
-                    onValueChange={(v) => setRiskTolerance((v[0] ?? 2) as 1 | 2 | 3)}
-                  />
-                  <div className="flex justify-between text-[11px] text-muted-foreground mt-1">
-                    <span>Safe</span><span>Balanced</span><span>Aggressive</span>
+                  <div>
+                    <Label className="text-sm">Risk tolerance</Label>
+                    <div className="mt-2">
+                      <Slider
+                        value={[riskTolerance]}
+                        min={1}
+                        max={3}
+                        step={1}
+                        onValueChange={(v) => setRiskTolerance((v[0] ?? 2) as 1 | 2 | 3)}
+                      />
+                      <div className="flex justify-between text-[11px] text-muted-foreground mt-1">
+                        <span>Safe</span><span>Balanced</span><span>Aggressive</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
 
-          </TabsContent>
+              </TabsContent>
 
-          <TabsContent value="runtime" className="mt-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="sm:col-span-2">
-                <HoursSlider value={weeklyHours} onChange={(v)=> setWeeklyHours(v)} />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-sm">Target qualification</Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="number" min={50} max={100}
-                    value={targetThreshold}
-                    onChange={(e)=> setTargetThreshold(Number(e.target.value))}
-                    className="w-24"
-                  />
-                  <span className="text-sm text-muted-foreground">%</span>
+              <TabsContent value="runtime" className="mt-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="sm:col-span-2">
+                    <HoursSlider value={weeklyHours} onChange={(v)=> setWeeklyHours(v)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm">Target qualification</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number" min={50} max={100}
+                        value={targetThreshold}
+                        onChange={(e)=> setTargetThreshold(Number(e.target.value))}
+                        className="w-24"
+                      />
+                      <span className="text-sm text-muted-foreground">%</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              We’ll draw a goal line at the target qualification and overlay scenarios (8/10/15h).
-            </p>
-          </TabsContent>
-        </Tabs>
-          </section>
-        </motion.div>
-      )}
-
-      {activeTab === "profile" && (
-        <motion.div key="tab-profile" {...fadeSlide} className="space-y-6">
-          {/* Resume uploader + Profile */}
-          <section className="rounded-xl border p-4 space-y-3">
-            <h2 className="text-lg font-semibold">Your Profile</h2>
-            {/* Paste Resume (unchanged component) */}
-            <div className="space-y-2">
-              <label className="block text-sm font-medium">Paste resume (optional)</label>
-              {/* keep your Textarea + Upload button */}
-              <Textarea
-                value={resume}
-                onChange={(e: any) => setResume(e.target.value)}
-                placeholder="Paste resume text here..."
-                className="h-40"
-              />
-              <Button onClick={uploadResume} disabled={loading}>
-                Upload Resume
-              </Button>
-            </div>
-
-            <Separator className="my-3" />
-
-            <h2 className="text-lg font-semibold">Connect Profile</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-start">
-          <div className="sm:col-span-3 space-y-1">
-            <label className="block text-sm font-medium">LinkedIn URL</label>
-            <Input
-              value={linkedinUrl}
-              onChange={(e) => setLinkedinUrl(e.target.value)}
-              placeholder="https://www.linkedin.com/in/your-handle"
-              inputMode="url"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="block text-sm font-medium">Years of experience</label>
-            <Input
-              type="number"
-              min={0}
-              max={50}
-              value={yearsExp}
-              onChange={(e) => setYearsExp(e.target.value === "" ? "" : Number(e.target.value))}
-              placeholder="e.g., 4"
-              className="w-28"
-            />
-          </div>
-
-          <div className="space-y-1 sm:col-span-2">
-            <label className="block text-sm font-medium">Stacks (comma separated)</label>
-            <Input
-              value={stackInput}
-              onChange={(e) => setStackInput(e.target.value)}
-              placeholder="Rust, Tokio, Go, gRPC, PostgreSQL"
-            />
-            <p className="text-xs text-muted-foreground">We’ll dedupe and normalize against the skill catalog.</p>
-          </div>
-
-          <div className="sm:col-span-3 space-y-1">
-            <label className="block text-sm font-medium">Education</label>
-            <Textarea
-              value={educationText}
-              onChange={(e) => setEducationText(e.target.value)}
-              placeholder="e.g., BSc in Computer Science, University of X (2019)"
-              className="h-20"
-            />
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={saveProfile}>Save profile</Button>
-        </div>
-          </section>
-        </motion.div>
-      )}
-
-      {activeTab === "jobs" && (
-        <motion.div key="tab-jobs" {...fadeSlide} className="space-y-6">
-          {/* Job Finder controls */}
-          <section className="rounded-xl border p-4 space-y-3">
-            <h2 className="text-lg font-semibold">Find openings</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 items-end">
-          <div className="sm:col-span-2">
-            <Label className="text-sm">Role / Keyword</Label>
-            <Input value={role} onChange={(e)=> setRole(e.target.value)} placeholder="e.g., backend developer" />
-          </div>
-          <div className="sm:col-span-2">
-            <Label className="text-sm">Location</Label>
-            <Input value={location} onChange={(e)=> setLocation(e.target.value)} placeholder="e.g., Singapore" />
-          </div>
-          <div className="flex items-center gap-2">
-            <Switch id="remoteOnly" checked={remoteOnly} onCheckedChange={(v)=> setRemoteOnly(Boolean(v))}/>
-            <Label htmlFor="remoteOnly" className="text-sm">Remote only</Label>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2 justify-end">
-          <Button onClick={fetchJobs} disabled={loading} variant="secondary">
-            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Fetch JSearch
-          </Button>
-          <Button onClick={findSimilar} disabled={loading} variant="outline">
-            Find Similar Jobs
-          </Button>
-        </div>
-          </section>
-
-          {message && (
-            <motion.div {...fadeSlide} className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
-              {message}
+                <p className="text-[11px]  text-muted-foreground mt-2">
+                  We’ll draw a goal line at the target qualification and overlay scenarios (8/10/15h).
+                </p>
+              </TabsContent>
+            </Tabs>
+              </section>
             </motion.div>
           )}
 
-          {/* Target job selector (compact) */}
-          {jobs.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2">
-              <label className="text-sm font-medium">Target job for C–F</label>
-            
-              <select
-            className="border rounded-md px-2 py-1 text-sm"
-            value={selectedJobId ?? jobs[0]?.id}
-            onChange={(e) => {
-              const id = e.target.value;
-              setSelectedJobId(id);
-              // keep 3 most-relevant job ids for potential citations
-              const top3 = jobs.slice(0, 3).map((j) => j.id);
-              // ensure selected is included
-              const citations = Array.from(new Set([id, ...top3])).slice(0, 5);
-              setCitedJobIds(citations);
-            }}
-          >
-            {jobs.map((j) => (
-              <option key={j.id} value={j.id}>
-                {j.title} @ {j.company} — {(j.score * 100).toFixed(1)}%
-              </option>
-            ))}
-              </select>
-            </div>
-          )}
+          {activeTab === "profile" && (
+            <motion.div key="tab-profile" {...fadeSlide} className="space-y-6">
+              {/* Resume uploader + Profile */}
+              <section className="rounded-xl border p-4 space-y-3">
+                <h2 className="text-sm font-semibold">Your Profile</h2>
+                {/* Paste Resume (unchanged component) */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium">Paste resume (optional)</label>
+                  {/* keep your Textarea + Upload button */}
+                  <Textarea
+                    value={resume}
+                    onChange={(e: any) => setResume(e.target.value)}
+                    placeholder="Paste resume text here..."
+                    className="h-40"
+                  />
+                  <Button onClick={uploadResume} disabled={loading}>
+                    Upload Resume
+                  </Button>
+                </div>
 
-          {/* Job results — compact list with pagination */}
-          {!!jobs.length && (
-            <section className="space-y-3">
-              <div className="grid gap-3">
-                {pagedJobs.map((job) => <JobRow key={job.id} job={job} />)}
+                <Separator className="my-3" />
+
+                <h2 className="text-sm font-semibold">Connect Profile</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-start">
+              <div className="sm:col-span-3 space-y-1">
+                <label className="block text-sm font-medium">LinkedIn URL</label>
+                <Input
+                  value={linkedinUrl}
+                  onChange={(e) => setLinkedinUrl(e.target.value)}
+                  placeholder="https://www.linkedin.com/in/your-handle"
+                  inputMode="url"
+                />
               </div>
 
-              {totalJobPages > 1 && (
-                <div className="flex items-center justify-between pt-2">
-                  <p className="text-xs text-muted-foreground">
-                    Page {jobsPage} of {totalJobPages}
-                  </p>
+              <div className="space-y-1">
+                <label className="block text-sm font-medium">Years of experience</label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={50}
+                  value={yearsExp}
+                  onChange={(e) => setYearsExp(e.target.value === "" ? "" : Number(e.target.value))}
+                  placeholder="e.g., 4"
+                  className="w-28"
+                />
+              </div>
+
+              <div className="space-y-1 sm:col-span-2">
+                <label className="block text-sm font-medium">Stacks (comma separated)</label>
+                <Input
+                  value={stackInput}
+                  onChange={(e) => setStackInput(e.target.value)}
+                  placeholder="Rust, Tokio, Go, gRPC, PostgreSQL"
+                />
+                <p className="text-[11px]  text-muted-foreground">We’ll dedupe and normalize against the skill catalog.</p>
+              </div>
+
+              <div className="sm:col-span-3 space-y-1">
+                <label className="block text-sm font-medium">Education</label>
+                <Textarea
+                  value={educationText}
+                  onChange={(e) => setEducationText(e.target.value)}
+                  placeholder="e.g., BSc in Computer Science, University of X (2019)"
+                  className="h-20"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={saveProfile}>Save profile</Button>
+            </div>
+              </section>
+            </motion.div>
+          )}
+
+          {activeTab === "jobs" && (
+            <motion.div key="tab-jobs" {...fadeSlide} className="space-y-6">
+              {/* Job Finder controls */}
+              <section className="rounded-xl border p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold">Find openings</h2>
                   <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setJobsPage((p) => Math.max(1, p - 1))}
-                      disabled={jobsPage === 1}
-                    >
-                      Prev
+                    <Button onClick={fetchJobs} disabled={loading} size="sm" variant="secondary">
+                      {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      Fetch
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setJobsPage((p) => Math.min(totalJobPages, p + 1))}
-                      disabled={jobsPage === totalJobPages}
-                    >
-                      Next
+                    <Button onClick={findSimilar} disabled={loading} size="sm" variant="outline">
+                      Similar
                     </Button>
                   </div>
                 </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 items-end">
+                  <div className="sm:col-span-2">
+                    <Label className="text-xs">Role / Keyword</Label>
+                    <Input value={role} onChange={(e)=> setRole(e.target.value)} placeholder="backend developer" />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label className="text-xs">Location</Label>
+                    <Input value={location} onChange={(e)=> setLocation(e.target.value)} placeholder="e.g., Singapore" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Switch id="remoteOnly" checked={remoteOnly} onCheckedChange={(v)=> setRemoteOnly(Boolean(v))}/>
+                    <Label htmlFor="remoteOnly" className="text-xs">Remote only</Label>
+                  </div>
+                </div>
+              </section>
+
+              {message && (
+                <motion.div {...fadeSlide} className="rounded-lg border bg-muted/40 px-3 py-2 text-sm">
+                  {message}
+                </motion.div>
               )}
-            </section>
+
+              {/* Target job selector (compact) */}
+              {jobs.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="text-sm font-medium">Target job for C–F</label>
+                
+                  <select
+                className="border rounded-lg px-2 py-1 text-sm"
+                value={selectedJobId ?? jobs[0]?.id}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  setSelectedJobId(id);
+                  // keep 3 most-relevant job ids for potential citations
+                  const top3 = jobs.slice(0, 3).map((j) => j.id);
+                  // ensure selected is included
+                  const citations = Array.from(new Set([id, ...top3])).slice(0, 5);
+                  setCitedJobIds(citations);
+                }}
+              >
+                {jobs.map((j) => (
+                  <option key={j.id} value={j.id}>
+                    {j.title} @ {j.company} — {(j.score * 100).toFixed(1)}%
+                  </option>
+                ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Job results — compact list with pagination */}
+              {!!jobs.length && (
+                <section className="space-y-3">
+                  <div className="grid gap-3">
+                    {pagedJobs.map((job) => <JobRow key={job.id} job={job} />)}
+                  </div>
+
+                  {totalJobPages > 1 && (
+                    <div className="flex items-center justify-between pt-2">
+                      <p className="text-[11px]  text-muted-foreground">
+                        Page {jobsPage} of {totalJobPages}
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setJobsPage((p) => Math.max(1, p - 1))}
+                          disabled={jobsPage === 1}
+                        >
+                          Prev
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setJobsPage((p) => Math.min(totalJobPages, p + 1))}
+                          disabled={jobsPage === totalJobPages}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </section>
+              )}
+              {!jobs.length && (
+                <EmptyState title="No openings yet" hint="Try Fetch or adjust role/location." />
+              )}
+            </motion.div>
           )}
-        </motion.div>
-      )}
 
-      {activeTab === "results" && (
-        <motion.div key="tab-results" {...fadeSlide} className="space-y-6">
-          {Object.keys(compareSeries).length > 0 && (
-            <section className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-base font-semibold">Decision Duel — outcome bands</h3>
-                <Button size="sm" variant="outline" onClick={() => onRunG()}>
-                  Recompute
-                </Button>
-              </div>
+          {activeTab === "results" && (
+            <motion.div key="tab-results" {...fadeSlide} className="space-y-6">
+              {Object.keys(compareSeries).length > 0 && (
+                <section className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-base font-semibold">Decision Duel — outcome bands</h3>
+                    <Button size="sm" variant="outline" onClick={() => onRunG()}>
+                      Recompute
+                    </Button>
+                  </div>
 
-              {/* Simple comparison table of quick facts */}
-              <div className="rounded-lg border overflow-hidden">
+                  {/* Simple comparison table of quick facts */}
+                  <div className="rounded-lg border overflow-hidden">
 
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {decisionSummaries.map((s) => {
-                    const d = decisions.find(d => d.id === s.decisionId);
-                    return (
-                      <Card key={s.decisionId} className="shadow-sm">
-                        <CardHeader className="py-3">
-                          <CardTitle className="text-base">{d?.label}</CardTitle>
-                          <div className="text-[11px] text-muted-foreground">
-                            {s.cohortSize ? `${s.cohortSize} similar profiles` : "cohort unknown"}
-                            {s.riskNotes ? ` — ${s.riskNotes}` : ""}
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {decisionSummaries.map((s) => {
+                        const d = decisions.find(d => d.id === s.decisionId);
+                        return (
+                          <Card key={s.decisionId} className="shadow-sm">
+                            <CardHeader className="py-2">
+                                <CardTitle className="text-sm">{d?.label}</CardTitle>
+                                <div className="text-[11px] text-muted-foreground">
+                                  {s.cohortSize ? `${s.cohortSize} similar` : "cohort unknown"}
+                                  {s.riskNotes ? ` — ${s.riskNotes}` : ""}
+                                </div>
+                              </CardHeader>
+                            <CardContent className="grid grid-cols-2 gap-2 text-sm">
+                              <div className="rounded-lg border p-2">
+                                <div className="text-[11px] text-muted-foreground">First offer (p50)</div>
+                                <div className="font-medium">{s.timeToOfferP50 ? `${s.timeToOfferP50} weeks` : "—"}</div>
+                              </div>
+                              <div className="rounded-lg border p-2">
+                                <div className="text-[11px] text-muted-foreground">1-yr comp</div>
+                                <div className="font-medium">
+                                  {s.comp1yr != null ? `${s.currency ?? ""} ${s.comp1yr.toLocaleString()}` : "—"}
+                                </div>
+                              </div>
+                              <div className="rounded-lg border p-2">
+                                <div className="text-[11px] text-muted-foreground">3-yr ceiling</div>
+                                <div className="font-medium">
+                                  {s.comp3yrCeiling != null ? `${s.currency ?? ""} ${s.comp3yrCeiling.toLocaleString()}` : "—"}
+                                </div>
+                              </div>
+                              <div className="rounded-lg border p-2 flex items-center justify-between">
+                                <div>
+                                  <div className="text-[11px] text-muted-foreground">Well-being</div>
+                                  <RiskBadge score={s.burnoutRisk} />
+                                </div>
+                                {s.burnoutRisk != null && (
+                                  <div className="w-24">
+                                    <Progress value={s.burnoutRisk} />
+                                  </div>
+                                )}
+                              </div>
+                            </CardContent>
+                            {s.explanation && (
+                              <CardFooter className="pt-0">
+                                <p className="text-[11px]  text-muted-foreground">{s.explanation}</p>
+                              </CardFooter>
+                            )}
+                          </Card>
+                        );
+                      })}
+                    </div>
+
+                  </div>
+
+                  {/* Mini band chart for the first selected decision (keep it lightweight) */}
+                  <div className="w-full h-64 rounded-lg border p-3">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={(compareSeries[selectedDecisionIds[0]] ?? []).map(d => ({
+                        week: d.week, p25: d.p25, p50: d.p50, p75: d.p75
+                      }))}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="week" />
+                        <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
+                        <Tooltip formatter={(v:any)=> `${v}%`} labelFormatter={(l)=>`Week ${l}`} />
+                        <Legend />
+                        <ReferenceLine y={targetThreshold} strokeDasharray="4 4" label={`${targetThreshold}% target`} />
+                        <Line type="monotone" dataKey="p25" name="p25" dot />
+                        <Line type="monotone" dataKey="p50" name="p50 (median)" dot />
+                        <Line type="monotone" dataKey="p75" name="p75" dot />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  <p className="text-[11px]  text-muted-foreground">
+                    Bands show uncertainty from similar profiles. Risk tolerance biases plan selection and the simulator’s assumptions.
+                  </p>
+                </section>
+              )}
+
+              {!Object.keys(compareSeries).length && !simSteps.length && (
+                <EmptyState title="No results yet" hint="Run a simulation to visualize progress." />
+              )}
+
+              {transitions.length > 0 && (
+                <section className="space-y-3">
+                  <h2 className="text-sm font-semibold">Path Explorer</h2>
+
+                  {/* Bridge skills filter */}
+                  <div className="flex flex-wrap gap-2">
+                    {bridgeSkills.map((bs) => {
+                      const on = activeBridge === bs;
+                      return (
+                        <Button
+                          key={bs}
+                          size="sm"
+                          variant={on ? "default" : "outline"}
+                          onClick={() => setActiveBridge(on ? null : bs)}
+                        >
+                          {bs}
+                        </Button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Transitions list with confidence bands + example profiles */}
+                  <div className="rounded-lg border divide-y">
+                    {transitions
+                      .filter((t) => !activeBridge || t.bridgeSkill === activeBridge)
+                      .map((t, idx) => (
+                        <div key={idx} className="p-3 grid grid-cols-5 gap-2 items-center">
+                          <div className="text-sm truncate">{t.fromSkill}</div>
+                          <div className="text-sm text-center">
+                            → <Badge className="mx-1" variant="secondary">{t.bridgeSkill}</Badge> →
                           </div>
-                        </CardHeader>
-                        <CardContent className="grid grid-cols-2 gap-3 text-sm">
-                          <div className="rounded-md border p-2">
-                            <div className="text-[11px] text-muted-foreground">First offer (p50)</div>
-                            <div className="font-medium">{s.timeToOfferP50 ? `${s.timeToOfferP50} weeks` : "—"}</div>
-                          </div>
-                          <div className="rounded-md border p-2">
-                            <div className="text-[11px] text-muted-foreground">1-yr comp</div>
-                            <div className="font-medium">
-                              {s.comp1yr != null ? `${s.currency ?? ""} ${s.comp1yr.toLocaleString()}` : "—"}
+                          <div className="text-sm truncate">{t.toRole}</div>
+                          <div className="space-y-1">
+                            <div className="text-[11px] text-muted-foreground">Confidence (p25 / p50 / p75)</div>
+                            <div className="flex items-center gap-2">
+                              <Progress value={t.confidence.p50} className="w-32" />
+                              <span className="text-xs">
+                                {t.confidence.p25}% / {t.confidence.p50}% / {t.confidence.p75}%
+                              </span>
                             </div>
                           </div>
-                          <div className="rounded-md border p-2">
-                            <div className="text-[11px] text-muted-foreground">3-yr ceiling</div>
-                            <div className="font-medium">
-                              {s.comp3yrCeiling != null ? `${s.currency ?? ""} ${s.comp3yrCeiling.toLocaleString()}` : "—"}
-                            </div>
+                          <div className="flex flex-wrap gap-1 justify-end">
+                            {t.exampleProfileIds.slice(0, 3).map((pid) => (
+                              <Button
+                                key={pid}
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 text-xs underline"
+                                onClick={() => setShowProfileId(pid)}
+                              >
+                                Profile {pid}
+                              </Button>
+                            ))}
                           </div>
-                          <div className="rounded-md border p-2 flex items-center justify-between">
-                            <div>
-                              <div className="text-[11px] text-muted-foreground">Well-being</div>
-                              <RiskBadge score={s.burnoutRisk} />
+                        </div>
+                      ))}
+                  </div>
+
+                  {/* Example profile modal */}
+                  <Dialog open={!!showProfileId} onOpenChange={(o) => !o && setShowProfileId(null)}>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Example profile</DialogTitle>
+                      </DialogHeader>
+                      {showProfileId && (
+                        <div className="space-y-2 text-sm">
+                          <div className="font-medium">
+                            {exampleProfiles[showProfileId]?.title || `Profile ${showProfileId}`}
+                          </div>
+                          <p className="text-muted-foreground whitespace-pre-wrap">
+                            {exampleProfiles[showProfileId]?.summary}
+                          </p>
+                          {exampleProfiles[showProfileId]?.outcome && (
+                            <div className="text-[11px]  text-muted-foreground">
+                              {exampleProfiles[showProfileId]?.outcome?.timeToOfferWeeks
+                                ? `Offer in ~${exampleProfiles[showProfileId]?.outcome?.timeToOfferWeeks} weeks`
+                                : null}
+                              {exampleProfiles[showProfileId]?.outcome?.comp1yr
+                                ? ` • 1-yr comp: ${exampleProfiles[showProfileId]?.outcome?.comp1yr.toLocaleString()}`
+                                : null}
                             </div>
-                            {s.burnoutRisk != null && (
-                              <div className="w-24">
-                                <Progress value={s.burnoutRisk} />
+                          )}
+                        </div>
+                      )}
+                    </DialogContent>
+                  </Dialog>
+                  <div className="w-full h-[440px] rounded-lg border overflow-hidden">
+                    <ReactFlow
+                      nodes={rfNodes}
+                      edges={rfEdges}
+                      onNodesChange={onNodesChange}
+                      onEdgesChange={onEdgesChange}
+                      fitView
+                      proOptions={{ hideAttribution: true }}
+                      onEdgeClick={(_, edge: any) => {
+                        const ids = (edge?.data?.exampleProfileIds as string[]) || [];
+                        if (ids[0]) setShowProfileId(ids[0]); // open modal you already wired
+                      }}
+                    >
+                      <MiniMap pannable zoomable />
+                      <Controls showInteractive />
+                      <Background />
+                    </ReactFlow>
+                  </div>
+                  <p className="text-[11px]  text-muted-foreground">
+                    Click an edge to open an example profile for that bridge. Edge labels show median confidence (p50).
+                  </p>
+                </section>
+              )}
+
+
+              {weeklyPlan.length > 0 && (
+                <section className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-sm font-semibold">Week-by-Week Plan</h2>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => setCurrentWeek(Math.max(1, currentWeek - 1))}>Prev</Button>
+                      <Button size="sm" variant="outline" onClick={() => setCurrentWeek(Math.min(weeklyPlan.length, currentWeek + 1))}>Next</Button>
+                      <Button size="sm" onClick={() => autoAdjustPlan(currentWeek)}>Auto-adjust from Week {currentWeek}</Button>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3">
+                    {weeklyPlan.map((w) => {
+                      const observed = getObservedHours(w);
+                      const slip = observed < w.plannedHours;
+                      return (
+                        <Card key={w.week} className={w.week === currentWeek ? "ring-2 ring-primary" : ""}>
+                          <CardHeader className="py-3 flex flex-row items-center justify-between">
+                            <div className="space-y-1">
+                              <CardTitle className="text-base">Week {w.week}</CardTitle>
+                              <div className="text-[11px]  text-muted-foreground">
+                                Planned {w.plannedHours}h • Observed {observed}h
+                                {w.carriesOverFrom ? ` • Carry-over from week ${w.carriesOverFrom}` : ""}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {w.checkpoint ? <Badge variant="secondary">Checkpoint</Badge> : null}
+                              {slip ? <Badge variant="destructive">Behind</Badge> : <Badge variant="outline">On track</Badge>}
+                            </div>
+                          </CardHeader>
+                          <CardContent className="space-y-3">
+                            <Progress value={Math.min(100, (observed / Math.max(1, w.plannedHours)) * 100)} />
+                            {w.checkpoint && (
+                              <div className="rounded-lg border p-2 text-xs">
+                                <div className="font-medium">{w.checkpoint.title}</div>
+                                <div className="text-muted-foreground">{w.checkpoint.criteria}</div>
                               </div>
                             )}
-                          </div>
-                        </CardContent>
-                        {s.explanation && (
-                          <CardFooter className="pt-0">
-                            <p className="text-xs text-muted-foreground">{s.explanation}</p>
-                          </CardFooter>
-                        )}
-                      </Card>
-                    );
-                  })}
-                </div>
+                            <div className="space-y-2">
+                              {(w.tasks || []).map((t) => (
+                                <div key={t.id} className="flex items-center justify-between rounded-lg border p-2">
+                                  <div className="flex items-center gap-2">
+                                    <Checkbox checked={!!t.done} onCheckedChange={() => toggleTask(w.week, t.id)} />
+                                    <div>
+                                      <div className="text-sm">{t.title}</div>
+                                      <div className="text-[11px]  text-muted-foreground">
+                                        {t.skill ? `${t.skill} • ` : ""}{t.estHours}h • {t.priority.toUpperCase()}
+                                        {t.url ? <> • <a className="underline" href={t.url} target="_blank" rel="noreferrer">resource</a></> : null}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  {t.done ? <Badge variant="secondary">Done</Badge> : null}
+                                </div>
+                              ))}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
 
+              {/* Simulation chart + controls (move your whole simulation section here) */}
+              {(multiSeries.length > 0 || simSteps.length > 0) ? (
+                <section className="space-y-3">
+                  {/* keep your existing HoursSlider + Re-simulate + chart */}
+                  <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold">
+                  Simulation — Qualification vs Weeks {selectedJobId ? `(Job #${selectedJobId})` : ""}
+                </h2>
+                <div className="flex items-center gap-3">
+                  <HoursSlider value={weeklyHours} onChange={(v)=> setWeeklyHours(v)} />
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      // re-run E with hours variants around selection for comparison
+                      setSelectedPathIds((p) => p.slice(0, 3));
+                      onRunE();
+                    }}
+                  >
+                    Re-simulate
+                  </Button>
+                </div>
               </div>
 
-              {/* Mini band chart for the first selected decision (keep it lightweight) */}
-              <div className="w-full h-64 rounded-lg border p-3">
+              {/* Series toggles */}
+              <div className="flex flex-wrap gap-2">
+                {(multiSeries.length ? multiSeries.map(s => s.label) : ["Match score","Qualification probability"]).map((label) => {
+                  const on = activeSeries.includes(label);
+                  return (
+                    <Button
+                      key={label}
+                      size="sm"
+                      variant={on ? "default" : "outline"}
+                      onClick={() =>
+                        setActiveSeries((prev) =>
+                          prev.includes(label) ? prev.filter((l) => l !== label) : [...prev, label]
+                        )
+                      }
+                    >
+                      {on ? <BadgeCheck className="mr-1 h-4 w-4" /> : null}
+                      {label}
+                    </Button>
+                  );
+                })}
+              </div>
+
+              <div className="w-full h-72 rounded-lg border p-3">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={(compareSeries[selectedDecisionIds[0]] ?? []).map(d => ({
-                    week: d.week, p25: d.p25, p50: d.p50, p75: d.p75
-                  }))}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="week" />
-                    <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
-                    <Tooltip formatter={(v:any)=> `${v}%`} labelFormatter={(l)=>`Week ${l}`} />
-                    <Legend />
-                    <ReferenceLine y={targetThreshold} strokeDasharray="4 4" label={`${targetThreshold}% target`} />
-                    <Line type="monotone" dataKey="p25" name="p25" dot />
-                    <Line type="monotone" dataKey="p50" name="p50 (median)" dot />
-                    <Line type="monotone" dataKey="p75" name="p75" dot />
+                  <LineChart
+                    data={(multiSeries[0]?.steps || simSteps).map((row, idx) => {
+                      const base: Record<string, any> = { week: row.week, score: row.score, prob: row.prob };
+                      multiSeries.forEach((s, si) => { base[s.label] = s.steps[idx]?.score ?? null; });
+                      return base;
+                    })}
+                  >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="week" />
+                  <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
+                  <Tooltip formatter={(val: any) => (val == null ? "—" : `${val}%`)} labelFormatter={(l) => `Week ${l}`} />
+                  <ReferenceLine y={targetThreshold} strokeDasharray="4 4" label={`${targetThreshold}%`} />
+                  {multiSeries.length > 0 ? (
+                    multiSeries.map((s) =>
+                      activeSeries.includes(s.label) ? (
+                        <Line key={s.label} type="monotone" dataKey={s.label} name={s.label} dot={false} strokeWidth={2} />
+                      ) : null
+                    )
+                  ) : (
+                    <>
+                      {activeSeries.includes("Match score") && (
+                        <Line type="monotone" dataKey="score" name="Match score" dot={false} strokeWidth={2} />
+                      )}
+                      {activeSeries.includes("Qualification probability") && (
+                        <Line type="monotone" dataKey="prob" name="Qualification probability" dot={false} strokeWidth={2} />
+                      )}
+                    </>
+                  )}
                   </LineChart>
                 </ResponsiveContainer>
               </div>
-
-              <p className="text-xs text-muted-foreground">
-                Bands show uncertainty from similar profiles. Risk tolerance biases plan selection and the simulator’s assumptions.
+              <p className="text-[11px]  text-muted-foreground">
+                The dashed line marks your target qualification ({targetThreshold}%). Toggle series to compare scenarios.
               </p>
-            </section>
-          )}
-          {transitions.length > 0 && (
-            <section className="space-y-3">
-              <h2 className="text-lg font-semibold">Path Explorer</h2>
 
-              {/* Bridge skills filter */}
-              <div className="flex flex-wrap gap-2">
-                {bridgeSkills.map((bs) => {
-                  const on = activeBridge === bs;
-                  return (
-                    <Button
-                      key={bs}
-                      size="sm"
-                      variant={on ? "default" : "outline"}
-                      onClick={() => setActiveBridge(on ? null : bs)}
-                    >
-                      {bs}
-                    </Button>
-                  );
-                })}
-              </div>
+                </section>
+              ) : (
+                <Card className="p-6">
+                  <p className="text-sm text-muted-foreground">
+                    Run a simulation from the Jobs tab to see projected qualification over time.
+                  </p>
+                </Card>
+              )}
 
-              {/* Transitions list with confidence bands + example profiles */}
-              <div className="rounded-lg border divide-y">
-                {transitions
-                  .filter((t) => !activeBridge || t.bridgeSkill === activeBridge)
-                  .map((t, idx) => (
-                    <div key={idx} className="p-3 grid grid-cols-5 gap-2 items-center">
-                      <div className="text-sm truncate">{t.fromSkill}</div>
-                      <div className="text-sm text-center">
-                        → <Badge className="mx-1" variant="secondary">{t.bridgeSkill}</Badge> →
-                      </div>
-                      <div className="text-sm truncate">{t.toRole}</div>
-                      <div className="space-y-1">
-                        <div className="text-[11px] text-muted-foreground">Confidence (p25 / p50 / p75)</div>
-                        <div className="flex items-center gap-2">
-                          <Progress value={t.confidence.p50} className="w-32" />
-                          <span className="text-xs">
-                            {t.confidence.p25}% / {t.confidence.p50}% / {t.confidence.p75}%
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap gap-1 justify-end">
-                        {t.exampleProfileIds.slice(0, 3).map((pid) => (
-                          <Button
-                            key={pid}
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 px-2 text-xs underline"
-                            onClick={() => setShowProfileId(pid)}
-                          >
-                            Profile {pid}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-              </div>
-
-              {/* Example profile modal */}
-              <Dialog open={!!showProfileId} onOpenChange={(o) => !o && setShowProfileId(null)}>
-                <DialogContent className="sm:max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Example profile</DialogTitle>
-                  </DialogHeader>
-                  {showProfileId && (
-                    <div className="space-y-2 text-sm">
-                      <div className="font-medium">
-                        {exampleProfiles[showProfileId]?.title || `Profile ${showProfileId}`}
-                      </div>
-                      <p className="text-muted-foreground whitespace-pre-wrap">
-                        {exampleProfiles[showProfileId]?.summary}
-                      </p>
-                      {exampleProfiles[showProfileId]?.outcome && (
-                        <div className="text-xs text-muted-foreground">
-                          {exampleProfiles[showProfileId]?.outcome?.timeToOfferWeeks
-                            ? `Offer in ~${exampleProfiles[showProfileId]?.outcome?.timeToOfferWeeks} weeks`
-                            : null}
-                          {exampleProfiles[showProfileId]?.outcome?.comp1yr
-                            ? ` • 1-yr comp: ${exampleProfiles[showProfileId]?.outcome?.comp1yr.toLocaleString()}`
-                            : null}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </DialogContent>
-              </Dialog>
-              <div className="w-full h-[440px] rounded-lg border overflow-hidden">
-                <ReactFlow
-                  nodes={rfNodes}
-                  edges={rfEdges}
-                  onNodesChange={onNodesChange}
-                  onEdgesChange={onEdgesChange}
-                  fitView
-                  proOptions={{ hideAttribution: true }}
-                  onEdgeClick={(_, edge: any) => {
-                    const ids = (edge?.data?.exampleProfileIds as string[]) || [];
-                    if (ids[0]) setShowProfileId(ids[0]); // open modal you already wired
-                  }}
-                >
-                  <MiniMap pannable zoomable />
-                  <Controls showInteractive />
-                  <Background />
-                </ReactFlow>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Click an edge to open an example profile for that bridge. Edge labels show median confidence (p50).
-              </p>
-            </section>
-          )}
-
-
-          {weeklyPlan.length > 0 && (
-            <section className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold">Week-by-Week Plan</h2>
-                <div className="flex gap-2">
-                  <Button size="sm" variant="outline" onClick={() => setCurrentWeek(Math.max(1, currentWeek - 1))}>Prev</Button>
-                  <Button size="sm" variant="outline" onClick={() => setCurrentWeek(Math.min(weeklyPlan.length, currentWeek + 1))}>Next</Button>
-                  <Button size="sm" onClick={() => autoAdjustPlan(currentWeek)}>Auto-adjust from Week {currentWeek}</Button>
+            {similarReceipts.length > 0 && (
+              <section className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold">People Like Me — Receipts</h2>
+                  <Button size="sm" variant="outline" onClick={onRunH}>Refresh</Button>
                 </div>
-              </div>
 
-              <div className="grid gap-3">
-                {weeklyPlan.map((w) => {
-                  const observed = getObservedHours(w);
-                  const slip = observed < w.plannedHours;
-                  return (
-                    <Card key={w.week} className={w.week === currentWeek ? "ring-2 ring-primary" : ""}>
-                      <CardHeader className="py-3 flex flex-row items-center justify-between">
-                        <div className="space-y-1">
-                          <CardTitle className="text-base">Week {w.week}</CardTitle>
-                          <div className="text-xs text-muted-foreground">
-                            Planned {w.plannedHours}h • Observed {observed}h
-                            {w.carriesOverFrom ? ` • Carry-over from week ${w.carriesOverFrom}` : ""}
-                          </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {similarReceipts.map((p) => (
+                    <Card key={p.profileId} className="shadow-sm">
+                      <CardHeader className="py-2">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-base">Profile {p.profileId.replace(/^.+-/, "").toUpperCase()}</CardTitle>
+                          <Badge variant="secondary">{Math.round(p.similarity * 100)}% match</Badge>
                         </div>
-                        <div className="flex items-center gap-2">
-                          {w.checkpoint ? <Badge variant="secondary">Checkpoint</Badge> : null}
-                          {slip ? <Badge variant="destructive">Behind</Badge> : <Badge variant="outline">On track</Badge>}
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {p.pathTaken.map((chip, i) => (
+                            <Badge key={i} variant="outline" className="text-[11px]">{chip}</Badge>
+                          ))}
                         </div>
                       </CardHeader>
-                      <CardContent className="space-y-3">
-                        <Progress value={Math.min(100, (observed / Math.max(1, w.plannedHours)) * 100)} />
-                        {w.checkpoint && (
-                          <div className="rounded-md border p-2 text-xs">
-                            <div className="font-medium">{w.checkpoint.title}</div>
-                            <div className="text-muted-foreground">{w.checkpoint.criteria}</div>
+                      <CardContent className="space-y-2">
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">{p.snippet}</p>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div className="rounded-lg border p-2">
+                            <div className="text-[11px] text-muted-foreground">Offer timing</div>
+                            <div className="font-medium">{p.timeToOffer ? `~${p.timeToOffer} weeks` : "—"}</div>
                           </div>
-                        )}
-                        <div className="space-y-2">
-                          {(w.tasks || []).map((t) => (
-                            <div key={t.id} className="flex items-center justify-between rounded-md border p-2">
-                              <div className="flex items-center gap-2">
-                                <Checkbox checked={!!t.done} onCheckedChange={() => toggleTask(w.week, t.id)} />
-                                <div>
-                                  <div className="text-sm">{t.title}</div>
-                                  <div className="text-xs text-muted-foreground">
-                                    {t.skill ? `${t.skill} • ` : ""}{t.estHours}h • {t.priority.toUpperCase()}
-                                    {t.url ? <> • <a className="underline" href={t.url} target="_blank" rel="noreferrer">resource</a></> : null}
-                                  </div>
-                                </div>
-                              </div>
-                              {t.done ? <Badge variant="secondary">Done</Badge> : null}
+                          <div className="rounded-lg border p-2">
+                            <div className="text-[11px] text-muted-foreground">Comp after 1 yr</div>
+                            <div className="font-medium">
+                              {p.compAfter1yr != null ? `${salaryTarget?.currency ?? ""} ${p.compAfter1yr.toLocaleString()}` : "—"}
                             </div>
-                          ))}
+                          </div>
                         </div>
                       </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            </section>
-          )}
-
-          {/* Simulation chart + controls (move your whole simulation section here) */}
-          {(multiSeries.length > 0 || simSteps.length > 0) ? (
-            <section className="space-y-3">
-              {/* keep your existing HoursSlider + Re-simulate + chart */}
-              <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">
-              Simulation — Qualification vs Weeks {selectedJobId ? `(Job #${selectedJobId})` : ""}
-            </h2>
-            <div className="flex items-center gap-3">
-              <HoursSlider value={weeklyHours} onChange={(v)=> setWeeklyHours(v)} />
-              <Button
-                size="sm"
-                onClick={() => {
-                  // re-run E with hours variants around selection for comparison
-                  setSelectedPathIds((p) => p.slice(0, 3));
-                  onRunE();
-                }}
-              >
-                Re-simulate
-              </Button>
-            </div>
-          </div>
-
-          {/* Series toggles */}
-          <div className="flex flex-wrap gap-2">
-            {(multiSeries.length ? multiSeries.map(s => s.label) : ["Match score","Qualification probability"]).map((label) => {
-              const on = activeSeries.includes(label);
-              return (
-                <Button
-                  key={label}
-                  size="sm"
-                  variant={on ? "default" : "outline"}
-                  onClick={() =>
-                    setActiveSeries((prev) =>
-                      prev.includes(label) ? prev.filter((l) => l !== label) : [...prev, label]
-                    )
-                  }
-                >
-                  {on ? <BadgeCheck className="mr-1 h-4 w-4" /> : null}
-                  {label}
-                </Button>
-              );
-            })}
-          </div>
-
-          <div className="w-full h-72 rounded-lg border p-3">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart
-                data={(multiSeries[0]?.steps || simSteps).map((row, idx) => {
-                  const base: Record<string, any> = { week: row.week, score: row.score, prob: row.prob };
-                  multiSeries.forEach((s, si) => { base[s.label] = s.steps[idx]?.score ?? null; });
-                  return base;
-                })}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="week" />
-                <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
-                <Tooltip formatter={(val: any, name: string) => (val == null ? "—" : `${val}%`)} labelFormatter={(l) => `Week ${l}`} />
-                <Legend />
-                {/* goal line */}
-                <ReferenceLine y={targetThreshold} strokeDasharray="4 4" label={`${targetThreshold}% target`} />
-                {/* draw lines only if enabled */}
-                {multiSeries.length > 0 ? (
-                  multiSeries.map((s) =>
-                    activeSeries.includes(s.label) ? (
-                      <Line key={s.label} type="monotone" dataKey={s.label} name={s.label} dot />
-                    ) : null
-                  )
-                ) : (
-                  <>
-                    {activeSeries.includes("Match score") && (
-                      <Line type="monotone" dataKey="score" name="Match score" dot />
-                    )}
-                    {activeSeries.includes("Qualification probability") && (
-                      <Line type="monotone" dataKey="prob" name="Qualification probability" dot />
-                    )}
-                  </>
-                )}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            The dashed line marks your target qualification ({targetThreshold}%). Toggle series to compare scenarios.
-          </p>
-
-            </section>
-          ) : (
-            <Card className="p-6">
-              <p className="text-sm text-muted-foreground">
-                Run a simulation from the Jobs tab to see projected qualification over time.
-              </p>
-            </Card>
-          )}
-
-        {similarReceipts.length > 0 && (
-          <section className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">People Like Me — Receipts</h2>
-              <Button size="sm" variant="outline" onClick={onRunH}>Refresh</Button>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              {similarReceipts.map((p) => (
-                <Card key={p.profileId} className="shadow-sm">
-                  <CardHeader className="py-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-base">Profile {p.profileId.replace(/^.+-/, "").toUpperCase()}</CardTitle>
-                      <Badge variant="secondary">{Math.round(p.similarity * 100)}% match</Badge>
-                    </div>
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {p.pathTaken.map((chip, i) => (
-                        <Badge key={i} variant="outline" className="text-[11px]">{chip}</Badge>
-                      ))}
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{p.snippet}</p>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div className="rounded-md border p-2">
-                        <div className="text-[11px] text-muted-foreground">Offer timing</div>
-                        <div className="font-medium">{p.timeToOffer ? `~${p.timeToOffer} weeks` : "—"}</div>
-                      </div>
-                      <div className="rounded-md border p-2">
-                        <div className="text-[11px] text-muted-foreground">Comp after 1 yr</div>
-                        <div className="font-medium">
-                          {p.compAfter1yr != null ? `${salaryTarget?.currency ?? ""} ${p.compAfter1yr.toLocaleString()}` : "—"}
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                  {p.sources?.length ? (
-                    <CardFooter className="flex flex-wrap gap-2">
-                      {p.sources.map((s, i) =>
-                        s.url ? (
-                          <a key={i} href={s.url} target="_blank" rel="noreferrer" className="text-xs underline">
-                            {s.label}
-                          </a>
-                        ) : (
-                          <span key={i} className="text-xs text-muted-foreground">{s.label}</span>
-                        )
-                      )}
-                    </CardFooter>
-                  ) : null}
-                </Card>
-              ))}
-            </div>
-          </section>
-        )}
-
-        </motion.div>
-      )}
-
-      {activeTab === "orchestrator" && (
-        <motion.div key="tab-orchestrator" {...fadeSlide} className="space-y-6">
-          {/* Inline Orchestrator: convert Dialog to inline card for tab view */}
-          <section className="rounded-xl border">
-            <div className="p-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Agent Orchestrator</h2>
-              <div className="flex gap-2">
-                <Button variant="secondary" onClick={resetAgents}>Reset</Button>
-                <Button onClick={runAll}>Run all (A→F)</Button>
-              </div>
-            </div>
-            <Separator />
-            <ScrollArea className="max-h-[70vh] p-4">
-<div className="grid gap-3">
-          {AGENTS.map((a) => {
-            const s = agents[a.key];
-            return (
-              <Card key={a.key} className="shadow-sm">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0">
-                  <div className="space-y-1">
-                    <CardTitle className="text-base">
-                      Agent {a.key} — {a.title}
-                    </CardTitle>
-                    <p className="text-xs text-muted-foreground">{a.subtitle}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge
-                      variant={
-                        s.status === "done"
-                          ? "default"
-                          : s.status === "running"
-                          ? "secondary"
-                          : s.status === "error"
-                          ? "destructive"
-                          : "outline"
-                      }
-                    >
-                      {s.status.toUpperCase()}
-                    </Badge>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={
-                        a.key === "A" ? onRunA
-                        : a.key === "B" ? onRunB
-                        : a.key === "C" ? onRunC
-                        : a.key === "D" ? onRunD
-                        : a.key === "E" ? onRunE
-                        : a.key === "F" ? onRunF
-                        : a.key === "G" ? onRunG
-                        : onRunH
-                      }
-                    >
-                      Run this agent
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <Progress value={s.progress} />
-                  <div className="rounded-md bg-muted p-2 text-xs max-h-28 overflow-auto leading-relaxed">
-                    {s.log.length ? (
-                      s.log.map((line, i) => <div key={i}>• {line}</div>)
-                    ) : (
-                      <div className="text-muted-foreground">No logs yet.</div>
-                    )}
-                  </div>
-
-                  {/* Small dynamic bits per agent */}
-                  {a.key === "B" && jobs.length > 0 && (
-                    <div className="text-xs">
-                      <span className="font-semibold">Top match:</span>{" "}
-                      {topJob?.title} @ {topJob?.company} —{" "}
-                      {(topJob!.score * 100).toFixed(1)}%
-                    </div>
-                  )}
-                  {a.key === "C" && topJob && clusterInfo && (
-                    <div className="text-xs">
-                      <span className="font-semibold">Role cluster:</span> {clusterInfo.name} ({(clusterInfo.sim*100).toFixed(1)}%)
-                    </div>
-                  )}
-                  {a.key === "C" && topJob && (
-                    <div className="text-xs">
-                      <span className="font-semibold">Gaps ({(gapsByJob[topJob.id]?.length ?? 0)}):</span>{" "}
-                      {gapsByJob[topJob.id]?.slice(0, 6).join(", ") ||
-                        "—"}
-                    </div>
-                  )}
-                  
-                  {a.key === "D" && paths.length > 0 && (
-                    <div className="text-xs space-y-2">
-                      <div className="font-semibold">Paths</div>
-                      <div className="flex flex-wrap gap-2">
-                        {paths.map((p) => {
-                          const on = selectedPathIds.includes(p.pathId);
-                          return (
-                            <Button
-                              key={p.pathId}
-                              size="sm"
-                              variant={on ? "default" : "outline"}
-                              onClick={() =>
-                                setSelectedPathIds((prev) =>
-                                  on ? prev.filter((id) => id !== p.pathId) : [...prev, p.pathId]
-                                )
-                              }
-                            >
-                              {p.name}
-                            </Button>
-                          );
-                        })}
-                      </div>
-                      <div className="text-muted-foreground">
-                        Tip: select 1–3 paths, then run Agent E.
-                      </div>
-                    </div>
-                  )}
-
-                  {a.key === "F" && explanation && (
-                    <pre className="text-xs whitespace-pre-wrap">{explanation}</pre>
-                  )}
-                  {a.key === "F" && (salaryTarget || salaryBaseline) && (
-                    <div className="text-xs grid gap-1">
-                      {salaryTarget && (
-                        <div>
-                          <span className="font-semibold">Target salary (median):</span>{" "}
-                          {salaryTarget.currency} {salaryTarget.median?.toLocaleString() ?? "—"}
-                          {salaryTarget.p25 && salaryTarget.p75
-                            ? `  (p25 ${salaryTarget.p25.toLocaleString()} • p75 ${salaryTarget.p75.toLocaleString()})`
-                            : ""}
-                          <span className="text-muted-foreground"> — {salaryTarget.source}</span>
-                        </div>
-                      )}
-                      {salaryBaseline && (
-                        <div>
-                          <span className="font-semibold">Baseline (median):</span>{" "}
-                          {salaryBaseline.currency} {salaryBaseline.median?.toLocaleString() ?? "—"}
-                          <span className="text-muted-foreground"> — {salaryBaseline.source}</span>
-                        </div>
-                      )}
-                      {salaryDelta && salaryDelta.medianDelta != null && (
-                        <div>
-                          <span className="font-semibold">Estimated delta:</span>{" "}
-                          {salaryDelta.currency} {salaryDelta.medianDelta.toLocaleString()}
-                        </div>
-                      )}
-                      {decisionSummaries.length > 0 && (
-                        <div className="text-[11px] text-muted-foreground">
-                          {decisionSummaries.map((s) => (
-                            <div key={`sum-${s.decisionId}`}>
-                              {decisions.find(d=>d.id===s.decisionId)?.label}:{" "}
-                              {s.cohortSize ? `${s.cohortSize} similar profiles` : "cohort unknown"}
-                              {s.riskNotes ? ` — ${s.riskNotes}` : ""}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                   {a.key === "F" && selectedJobId && citationsByJob[selectedJobId]?.length > 0 && (
-                    <div className="text-xs">
-                      <div className="font-semibold mb-1">Evidence from job description:</div>
-                      <div className="flex flex-wrap gap-2">
-                        {citationsByJob[selectedJobId].map((c, i) => (
-                          <TooltipShadcn key={`${c.skillId}-${i}`}>
-                            <TooltipTrigger asChild>
-                              <Badge variant="secondary">{c.name}</Badge>
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs whitespace-pre-wrap">
-                              <p className="text-[11px] leading-snug">{c.snippet}</p>
-                            </TooltipContent>
-                          </TooltipShadcn>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {plans.length > 0 && (
-                  <section className="rounded-xl border p-4 space-y-2 mt-3">
-                    <h3 className="text-sm font-semibold">My Plans</h3>
-                    <ul className="space-y-1 text-sm">
-                      {plans.map((p) => (
-                        <li key={p.id} className="flex items-center justify-between">
-                          <span>{p.title}</span>
-                          <div className="flex gap-2">
-                            <a
-                              href={`/api/export?planId=${p.id}&format=md`}
-                              className="underline"
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              Export .md
-                            </a>
-                            <a
-                              href={`/api/export?planId=${p.id}&format=pdf`}
-                              className="underline"
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              Export .pdf
-                            </a>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                    <div className="flex gap-2">
-                      <Button onClick={saveCurrentPlan}>Save plan</Button>
-                      {plans.length === 0 ? (
-                        <Button variant="outline" onClick={refreshPlans}>Load My Plans</Button>
+                      {p.sources?.length ? (
+                        <CardFooter className="flex flex-wrap gap-2">
+                          {p.sources.map((s, i) =>
+                            s.url ? (
+                              <a key={i} href={s.url} target="_blank" rel="noreferrer" className="text-xs underline">
+                                {s.label}
+                              </a>
+                            ) : (
+                              <span key={i} className="text-[11px]  text-muted-foreground">{s.label}</span>
+                            )
+                          )}
+                        </CardFooter>
                       ) : null}
-                    </div>
-                  </section>
-                )}
+                    </Card>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            
+
+            </motion.div>
+          )}
+
+          {activeTab === "orchestrator" && (
+            <motion.div key="tab-orchestrator" {...fadeSlide} className="space-y-6">
+              {/* Inline Orchestrator: convert Dialog to inline card for tab view */}
+              <section className="rounded-xl border">
+                <div className="p-4 flex items-center justify-between">
+                  <h2 className="text-sm font-semibold">Agent Orchestrator</h2>
+                  <div className="flex gap-2">
+                    <Button variant="secondary" onClick={resetAgents}>Reset</Button>
+                    <Button onClick={runAll}>Run all (A→F)</Button>
+                  </div>
+                </div>
+                <Separator />
+                <ScrollArea className="max-h-[70vh] p-4">
+    <div className="grid gap-3">
+              {AGENTS.map((a) => {
+                const s = agents[a.key];
+                return (
+                  <Card key={a.key} className="shadow-sm">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                      <div className="space-y-1">
+                        <CardTitle className="text-base">
+                          Agent {a.key} — {a.title}
+                        </CardTitle>
+                        <p className="text-[11px]  text-muted-foreground">{a.subtitle}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant={
+                            s.status === "done"
+                              ? "default"
+                              : s.status === "running"
+                              ? "secondary"
+                              : s.status === "error"
+                              ? "destructive"
+                              : "outline"
+                          }
+                        >
+                          {s.status.toUpperCase()}
+                        </Badge>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={
+                            a.key === "A" ? onRunA
+                            : a.key === "B" ? onRunB
+                            : a.key === "C" ? onRunC
+                            : a.key === "D" ? onRunD
+                            : a.key === "E" ? onRunE
+                            : a.key === "F" ? onRunF
+                            : a.key === "G" ? onRunG
+                            : onRunH
+                          }
+                        >
+                          Run this agent
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <Progress value={s.progress} />
+                      <div className="rounded-lg bg-muted p-2 text-xs max-h-28 overflow-auto leading-relaxed">
+                        {s.log.length ? (
+                          s.log.map((line, i) => <div key={i}>• {line}</div>)
+                        ) : (
+                          <div className="text-muted-foreground">No logs yet.</div>
+                        )}
+                      </div>
+
+                      {/* Small dynamic bits per agent */}
+                      {a.key === "B" && jobs.length > 0 && (
+                        <div className="text-xs">
+                          <span className="font-semibold">Top match:</span>{" "}
+                          {topJob?.title} @ {topJob?.company} —{" "}
+                          {(topJob!.score * 100).toFixed(1)}%
+                        </div>
+                      )}
+                      {a.key === "C" && topJob && clusterInfo && (
+                        <div className="text-xs">
+                          <span className="font-semibold">Role cluster:</span> {clusterInfo.name} ({(clusterInfo.sim*100).toFixed(1)}%)
+                        </div>
+                      )}
+                      {a.key === "C" && topJob && (
+                        <div className="text-xs">
+                          <span className="font-semibold">Gaps ({(gapsByJob[topJob.id]?.length ?? 0)}):</span>{" "}
+                          {gapsByJob[topJob.id]?.slice(0, 6).join(", ") ||
+                            "—"}
+                        </div>
+                      )}
+                      
+                      {a.key === "D" && paths.length > 0 && (
+                        <div className="text-xs space-y-2">
+                          <div className="font-semibold">Paths</div>
+                          <div className="flex flex-wrap gap-2">
+                            {paths.map((p) => {
+                              const on = selectedPathIds.includes(p.pathId);
+                              return (
+                                <Button
+                                  key={p.pathId}
+                                  size="sm"
+                                  variant={on ? "default" : "outline"}
+                                  onClick={() =>
+                                    setSelectedPathIds((prev) =>
+                                      on ? prev.filter((id) => id !== p.pathId) : [...prev, p.pathId]
+                                    )
+                                  }
+                                >
+                                  {p.name}
+                                </Button>
+                              );
+                            })}
+                          </div>
+                          <div className="text-muted-foreground">
+                            Tip: select 1–3 paths, then run Agent E.
+                          </div>
+                        </div>
+                      )}
+
+                      {a.key === "F" && explanation && (
+                        <pre className="text-xs whitespace-pre-wrap">{explanation}</pre>
+                      )}
+                      {a.key === "F" && (salaryTarget || salaryBaseline) && (
+                        <div className="text-xs grid gap-1">
+                          {salaryTarget && (
+                            <div>
+                              <span className="font-semibold">Target salary (median):</span>{" "}
+                              {salaryTarget.currency} {salaryTarget.median?.toLocaleString() ?? "—"}
+                              {salaryTarget.p25 && salaryTarget.p75
+                                ? `  (p25 ${salaryTarget.p25.toLocaleString()} • p75 ${salaryTarget.p75.toLocaleString()})`
+                                : ""}
+                              <span className="text-muted-foreground"> — {salaryTarget.source}</span>
+                            </div>
+                          )}
+                          {salaryBaseline && (
+                            <div>
+                              <span className="font-semibold">Baseline (median):</span>{" "}
+                              {salaryBaseline.currency} {salaryBaseline.median?.toLocaleString() ?? "—"}
+                              <span className="text-muted-foreground"> — {salaryBaseline.source}</span>
+                            </div>
+                          )}
+                          {salaryDelta && salaryDelta.medianDelta != null && (
+                            <div>
+                              <span className="font-semibold">Estimated delta:</span>{" "}
+                              {salaryDelta.currency} {salaryDelta.medianDelta.toLocaleString()}
+                            </div>
+                          )}
+                          {decisionSummaries.length > 0 && (
+                            <div className="text-[11px] text-muted-foreground">
+                              {decisionSummaries.map((s) => (
+                                <div key={`sum-${s.decisionId}`}>
+                                  {decisions.find(d=>d.id===s.decisionId)?.label}:{" "}
+                                  {s.cohortSize ? `${s.cohortSize} similar profiles` : "cohort unknown"}
+                                  {s.riskNotes ? ` — ${s.riskNotes}` : ""}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {a.key === "F" && selectedJobId && citationsByJob[selectedJobId]?.length > 0 && (
+                        <div className="text-xs">
+                          <div className="font-semibold mb-1">Evidence from job description:</div>
+                          <div className="flex flex-wrap gap-2">
+                            {citationsByJob[selectedJobId].map((c, i) => (
+                              <TooltipShadcn key={`${c.skillId}-${i}`}>
+                                <TooltipTrigger asChild>
+                                  <Badge variant="secondary">{c.name}</Badge>
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-xs whitespace-pre-wrap">
+                                  <p className="text-[11px] leading-snug">{c.snippet}</p>
+                                </TooltipContent>
+                              </TooltipShadcn>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {plans.length > 0 && (
+                      <section className="rounded-xl border p-4 space-y-2 mt-3">
+                        <h3 className="text-sm font-semibold">My Plans</h3>
+                        <ul className="space-y-1 text-sm">
+                          {plans.map((p) => (
+                            <li key={p.id} className="flex items-center justify-between">
+                              <span>{p.title}</span>
+                              <div className="flex gap-2">
+                                <a
+                                  href={`/api/export?planId=${p.id}&format=md`}
+                                  className="underline"
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  Export .md
+                                </a>
+                                <a
+                                  href={`/api/export?planId=${p.id}&format=pdf`}
+                                  className="underline"
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  Export .pdf
+                                </a>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                        <div className="flex gap-2">
+                          <Button onClick={saveCurrentPlan}>Save plan</Button>
+                          {plans.length === 0 ? (
+                            <Button variant="outline" onClick={refreshPlans}>Load My Plans</Button>
+                          ) : null}
+                        </div>
+                      </section>
+                    )}
 
 
 
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-            </ScrollArea>
-          </section>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+                </ScrollArea>
+              </section>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* subtle global message */}
+        {message && (
+          <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm">{message}</div>
+        )}
+      </section>
+    </div>
+  </DashboardShell>
 </main>
+
 
   );
 }
-
-
-
