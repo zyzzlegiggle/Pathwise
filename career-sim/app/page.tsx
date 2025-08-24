@@ -1169,9 +1169,13 @@ const onRunF = () => {
     );
   };
 
-  const DashboardShell: React.FC<{ title?: string; actions?: React.ReactNode; children: React.ReactNode }> = ({ title="Career Clone", actions, children }) => (
+  const DashboardShell: React.FC<{
+    title?: string;
+    actions?: React.ReactNode;
+    sidebar?: React.ReactNode; 
+    children: React.ReactNode;
+  }> = ({ title = "Career Clone", actions, sidebar, children }) => (
     <div className="mx-auto max-w-6xl">
-      {/* header */}
       <header className="sticky top-0 z-30 bg-background/80 backdrop-blur border-b">
         <div className="px-5 py-3 flex items-center justify-between">
           <h1 className="text-base font-semibold tracking-tight">{title}</h1>
@@ -1179,13 +1183,13 @@ const onRunF = () => {
         </div>
       </header>
 
-      {/* body with sidebar */}
-      <div className="grid grid-cols-12 gap-0">
+      <div className="grid grid-cols-12">
         <aside className="col-span-12 md:col-span-3 lg:col-span-2 border-r min-h-[calc(100vh-49px)]">
-          {/* you’ll wire activeTab into here */}
-          {/* placeholder; actual usage below in the main return */}
+          {sidebar /* ← render your nav here */}
         </aside>
-        <section className="col-span-12 md:col-span-9 lg:col-span-10 p-5">{children}</section>
+        <section className="col-span-12 md:col-span-9 lg:col-span-10 p-5">
+          {children /* ← main area gets built-in padding */}
+        </section>
       </div>
     </div>
   );
@@ -1217,25 +1221,22 @@ const onRunF = () => {
         <Button size="sm" onClick={runAll}><Play className="mr-1 h-4 w-4"/>Run pipeline</Button>
       </>
     }
+    sidebar={
+      <SidebarNav active={activeTab} onChange={(v) => setActiveTab(v as any)} />
+    }
   >
     {/* inject sidebar nav that controls activeTab */}
-    <div className="grid grid-cols-12 gap-0">
-      <aside className="col-span-12 md:col-span-3 lg:col-span-2 border-r">
-        <SidebarNav active={activeTab} onChange={(v)=> setActiveTab(v as any)} />
-      </aside>
 
-      <section className="col-span-12 md:col-span-9 lg:col-span-10 space-y-6">
-        {/* KPI strip – small, glanceable */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {/* KPI strip – small, glanceable */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
           <KPICard label="Openings" value={jobs.length || "—"} hint="from JSearch / similar" />
           <KPICard label="Target hours" value={`${weeklyHours} h/wk`} hint="simulation input" />
           <KPICard label="Qualification target" value={`${targetThreshold}%`} />
-          <KPICard
-            label="Selected job"
-            value={selectedJobId ? "Set" : "Not set"}
-            hint={selectedJobId ? undefined : "Pick in Openings"}
-          />
+          <KPICard label="Selected job" value={selectedJobId ? "Set" : "Not set"} hint={selectedJobId ? undefined : "Pick in Openings"} />
         </div>
+
+      <section className="col-span-12 md:col-span-9 lg:col-span-10 space-y-6">
+
 
         <AnimatePresence mode="wait">
           {activeTab === "plan" && (
@@ -2214,7 +2215,7 @@ const onRunF = () => {
           <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm">{message}</div>
         )}
       </section>
-    </div>
+
   </DashboardShell>
 </main>
 
