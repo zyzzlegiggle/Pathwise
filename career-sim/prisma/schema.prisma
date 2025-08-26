@@ -12,10 +12,8 @@ model User {
   email            String   @unique
   name             String?
   country          String?
-  years_experience Decimal? @db.Decimal(4,1)
   created_at       DateTime @default(now())
   skills           UserSkill[]
-  resume           Resume?
   simulations      Simulation[]
   goal             UserGoal?
   learningPaths    LearningPath[]
@@ -28,10 +26,9 @@ model User {
 
 model UserSkill {
   user_id     BigInt
-  skill_name  String
-  proficiency Int?
-  years       Decimal? @db.Decimal(4,1)
-  last_used   DateTime? @db.Date
+  skill_name  String // main thing thats used
+  proficiency Int? // currently not used so much
+  last_updated  DateTime? @db.Date
 
   user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
@@ -40,14 +37,6 @@ model UserSkill {
   @@map("user_skills")
 }
 
-model Resume {
-  user_id  BigInt @id
-  raw_text String @db.MediumText
-
-  user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
-
-  @@map("resumes")
-}
 
 model Job {
   job_id      BigInt   @id @default(autoincrement())
@@ -92,13 +81,6 @@ model JobRequirement {
   @@map("job_requirements")
 }
 
-model SkillCatalog {
-  skill_name String @id
-  category   String?
-  aliases    Json?
-
-  @@map("skills_catalog")
-}
 
 model Resource {
   resource_id    BigInt   @id @default(autoincrement())
@@ -197,15 +179,11 @@ model LearningPathRun { // optional: store chosen paths per run
 model SkillNode {
   id         BigInt   @id @default(autoincrement())
   name       String
-  esco_id    String?  @unique
-  onet_id    String?  @unique
   parent_id  BigInt?
   aliases    Json?
   // VECTOR embedding  in TiDB;, set via raw SQL
   @@index([parent_id])
 
-  parent     SkillNode? @relation("SkillTree", fields: [parent_id], references: [id])
-  children   SkillNode[] @relation("SkillTree")
 
    roleClusters RoleClusterSkill[]
 
@@ -254,11 +232,11 @@ model SalaryBenchmark {
 
 model UserProfile {
   user_id          BigInt   @id
-  linkedin_url     String?
+  resume           String @db.MediumText
   years_experience Int?     // 0..50
-  stacks           Json?    // ["Rust","Go","PostgreSQL"]
   education        String?
   updated_at       DateTime @updatedAt
+  // resume_embedding VECTOR
 
   user User @relation(fields: [user_id], references: [user_id])
   @@map("user_profile")

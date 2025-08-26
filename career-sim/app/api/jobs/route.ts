@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { embedText } from "@/lib/embed";
+import { embedText } from "@/lib/llm";
 import axios from "axios";
 
 /**

@@ -69,11 +69,9 @@ export async function GET(req: NextRequest) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             userId,
-            linkedinUrl: searchParams.get("linkedinUrl") || null,
             resumeText: resume || "",
             shortForm: {
               yearsExperience: Number(searchParams.get("yearsExp") || "0"),
-              stacks: (searchParams.get("stacks") || "").split(",").filter(Boolean),
               education: searchParams.get("education") || "",
             },
           }),

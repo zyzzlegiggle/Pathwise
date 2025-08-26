@@ -271,7 +271,7 @@ export default function HomePage() {
   const [decisions, setDecisions] = useState<DecisionOption[]>([
     { id: "self-study", label: "Self-study (10h/wk)", description: "Projects + open source" },
     { id: "bootcamp", label: "Part-time bootcamp", description: "Tuition + structured mentorship" },
-    { id: "internal-transfer", label: "Internal transfer", description: "Bridge role in current company" },
+    { id: "internal-transfer", label: "Internal transfer", description: "Move to a new role in current company" },
   ]);
 
   const [bridgeSkills, setBridgeSkills] = useState<string[]>([]);
@@ -471,25 +471,6 @@ export default function HomePage() {
   }
 
 
-  // ------------- existing handlers (minor fixes) -------------
-  async function uploadResume() {
-    setLoading(true);
-    setMessage("Uploading resume...");
-    try {
-      const res = await fetch("/api/ingest", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: "1", resumeText: resume }),
-      });
-      const data = await res.json();
-      setMessage(data.ok ? "Resume uploaded!" : "Failed to upload resume");
-    } catch {
-      setMessage("Error uploading resume");
-    } finally {
-      setLoading(false);
-    }
-  }
-
   async function fetchJobs() {
   setLoading(true);
   setMessage("Fetching jobs...");
@@ -622,17 +603,15 @@ export default function HomePage() {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       userId: "1",
-      linkedinUrl,
-      resumeText: resume, // optional — reuse paste if present
+      resumeText: resume, 
       shortForm: {
         yearsExperience: yearsExp === '' ? null : Number(yearsExp),
-        stacks,
         education: educationText,
       },
     }),
   });
   const data = await res.json();
-  setMessage(data.ok ? "Profile saved & skills deduped" : data.error || "Failed to save profile");
+  setMessage(data.ok ? "Profile saved" : data.error || "Failed to save profile");
 }
 
   async function saveCurrentPlan() {
@@ -1059,14 +1038,14 @@ const onRunF = () => {
                     View posting
                   </a>
                 )}
-                <Button size="xs" variant="secondary" onClick={() => analyzeGaps(job.id)} disabled={loading}>
+                <Button size="sm" variant="secondary" onClick={() => analyzeGaps(job.id)} disabled={loading}>
                   Analyze gaps
                 </Button>
-                <Button size="xs" variant="outline" onClick={() => simulate(job.id)} disabled={loading}>
+                <Button size="sm" variant="outline" onClick={() => simulate(job.id)} disabled={loading}>
                   Simulate
                 </Button>
                 <Button
-                  size="xs"
+                  size="sm"
                   variant={selectedJobId === job.id ? "default" : "outline"}
                   onClick={() => {
                     setSelectedJobId(job.id);
@@ -1113,7 +1092,7 @@ const onRunF = () => {
                       ) : (
                         <Button
                           key={`btn-${skill}`}
-                          size="xs"
+                          size="sm"
                           variant="outline"
                           onClick={() => fetchResources(skill)}
                           disabled={loading}
@@ -1390,32 +1369,18 @@ const onRunF = () => {
                 <h2 className="text-sm font-semibold">Your Profile</h2>
                 {/* Paste Resume (unchanged component) */}
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium">Paste resume (optional)</label>
+                  <label className="block text-sm font-medium">Resume</label>
                   {/* keep your Textarea + Upload button */}
                   <Textarea
                     value={resume}
                     onChange={(e: any) => setResume(e.target.value)}
-                    placeholder="Paste resume text here..."
+                    placeholder="Write your resume here..."
                     className="h-40"
                   />
-                  <Button onClick={uploadResume} disabled={loading}>
-                    Upload Resume
-                  </Button>
+                  
                 </div>
 
-                <Separator className="my-3" />
-
-                <h2 className="text-sm font-semibold">Connect Profile</h2>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-start">
-              <div className="sm:col-span-3 space-y-1">
-                <label className="block text-sm font-medium">LinkedIn URL</label>
-                <Input
-                  value={linkedinUrl}
-                  onChange={(e) => setLinkedinUrl(e.target.value)}
-                  placeholder="https://www.linkedin.com/in/your-handle"
-                  inputMode="url"
-                />
-              </div>
 
               <div className="space-y-1">
                 <label className="block text-sm font-medium">Years of experience</label>
@@ -1428,16 +1393,6 @@ const onRunF = () => {
                   placeholder="e.g., 4"
                   className="w-28"
                 />
-              </div>
-
-              <div className="space-y-1 sm:col-span-2">
-                <label className="block text-sm font-medium">Stacks (comma separated)</label>
-                <Input
-                  value={stackInput}
-                  onChange={(e) => setStackInput(e.target.value)}
-                  placeholder="Rust, Tokio, Go, gRPC, PostgreSQL"
-                />
-                <p className="text-[11px]  text-muted-foreground">We’ll dedupe and normalize against the skill catalog.</p>
               </div>
 
               <div className="sm:col-span-3 space-y-1">
