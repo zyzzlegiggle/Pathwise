@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
 // OPTIONAL placeholder — swap with your LLM of choice later.
-async function suggestSkillsWithLLM(seed: { role: string; stack: string[]; gaps: string[] }) {
+async function suggestSkillsWithLLM(seed: { role: string; gaps: string[] }) {
   // return top-N atomic skills; keep deterministic fallback
-  const base = Array.from(new Set([...seed.stack, ...seed.gaps]));
+  const base = Array.from(new Set([...seed.gaps]));
   return base.slice(0, 8);
 }
 
@@ -16,10 +16,10 @@ const TEMPLATES: Record<string, string[]> = {
 };
 
 export async function POST(req: NextRequest) {
-  const { userId = "1", jobId, targetRole = "backend SWE", stackPrefs = [], gaps = [], useLLM = false } = await req.json();
+  const { userId = "1", jobId, targetRole = "backend SWE", gaps = [], useLLM = false } = await req.json();
   if (!jobId) return NextResponse.json({ paths: [] });
 
-  // 1) seed from templates filtered by stackPrefs
+  // 1) seed from templates filtered 
   const names = Object.keys(TEMPLATES).filter(
     (n) => !stackPrefs.length || stackPrefs.some((p: string) => n.toLowerCase().includes(p.toLowerCase()))
   ).slice(0, 3);

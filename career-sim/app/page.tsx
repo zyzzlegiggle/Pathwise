@@ -153,19 +153,6 @@ type DecisionOption = { id: string; label: string; description?: string };
 // Uncertainty band for outcomes (p25/p50/p75 per week)
 type OutcomeBand = { week: number; p25: number; p50: number; p75: number };
 
-// Summary metrics per decision to show “why” + trade-offs
-export type DecisionSummary = {
-  decisionId: string;
-  cohortSize?: number;
-  timeToOfferP50?: number;       // weeks
-  salaryDeltaMedian?: number;    // vs baseline
-  comp1yr?: number;              
-  comp3yrCeiling?: number;       
-  burnoutRisk?: number;          
-  currency?: string;             
-  explanation?: string;   
-  riskNotes?: string;            // short text (“small cohort”, etc.)
-};
 type ConfidenceBand = { p25: number; p50: number; p75: number };
 type BridgeTransition = {
   fromSkill: string;
@@ -194,6 +181,21 @@ type RFEdge = {
   markerEnd?: any;
   data?: { p25: number; p50: number; p75: number; exampleProfileIds: string[] };
 };
+
+// Summary metrics per decision to show “why” + trade-offs
+export type DecisionSummary = {
+  decisionId: string;
+  cohortSize?: number;
+  timeToOfferP50?: number;       // weeks
+  salaryDeltaMedian?: number;    // vs baseline
+  comp1yr?: number;              
+  comp3yrCeiling?: number;       
+  burnoutRisk?: number;          
+  currency?: string;             
+  explanation?: string;   
+  riskNotes?: string;            // short text (“small cohort”, etc.)
+};
+
 
 
 type PlanTask = {
@@ -247,7 +249,6 @@ export default function HomePage() {
   const [multiSeries, setMultiSeries] = useState<Series[]>([]);
   const [goalRole, setGoalRole] = useState("backend SWE");
   const [goalMonths, setGoalMonths] = useState<[number, number]>([6, 9]);
-  const [stackPrefs, setStackPrefs] = useState<string[]>([]); // e.g., ["Rust","Go","Java"]
   const [paths, setPaths] = useState<{ pathId: string; name: string; skills: string[] }[]>([]);
   const [selectedPathIds, setSelectedPathIds] = useState<string[]>([]);
   const [clusterInfo, setClusterInfo] = useState<{id:string,name:string,sim:number}|null>(null);
@@ -256,14 +257,13 @@ export default function HomePage() {
   const [salaryDelta, setSalaryDelta] = useState<{currency:string; medianDelta:number|null}|null>(null);
   const [citationsByJob, setCitationsByJob] = useState<Record<string, Array<{skillId:string; name:string; start:number; end:number; snippet:string}>>>({});
   const [yearsExp, setYearsExp] = useState<number | ''>('');
-  const [stackInput, setStackInput] = useState("");   // comma-separated entry
   const [educationText, setEducationText] = useState("");
   const [savedPaths, setSavedPaths] = useState<any[]>([]);
   const [savedSeries, setSavedSeries] = useState<any[]>([]);
   const [weeklyHours, setWeeklyHours] = useState<number>(10);
   const [activeSeries, setActiveSeries] = useState<string[]>([]);   // which series are visible
   const [targetThreshold, setTargetThreshold] = useState<number>(75); // goal line on chart
-  const [activeTab, setActiveTab] = useState<"plan"|"profile"|"jobs"|"results"|"orchestrator">("plan");
+  const [activeTab, setActiveTab] = useState<"profile"|"jobs"|"results"|"orchestrator">("profile");
   const [jobsPage, setJobsPage] = useState(1);
   const [riskTolerance, setRiskTolerance] = useState<1 | 2 | 3>(2); // 1=safe,2=balanced,3=aggressive
   const [decisions, setDecisions] = useState<DecisionOption[]>([
@@ -279,7 +279,6 @@ export default function HomePage() {
   const [showProfileId, setShowProfileId] = useState<string | null>(null);
 
   const [weeklyPlan, setWeeklyPlan] = useState<WeeklyPlanWeek[]>([]);
-  const [observedHoursByWeek, setObservedHoursByWeek] = useState<Record<number, number>>({});
   const [currentWeek, setCurrentWeek] = useState<number>(1);
 
   const [rfNodes, setRfNodes, onNodesChange] = useNodesState<RFNode>([]);
@@ -576,24 +575,8 @@ export default function HomePage() {
     return es;
   }
 
-    async function saveGoals() {
-    await fetch("/api/goals", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId: "1",
-        targetRole: goalRole,
-        timeframeMin: goalMonths[0],
-        timeframeMax: goalMonths[1],
-        stackPrefs,
-      }),
-    });
-  }
   async function saveProfile() {
-  const stacks = stackInput
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
+
 
   const res = await fetch("/api/ingest/profile", {
     method: "POST",
@@ -681,8 +664,7 @@ export default function HomePage() {
             userId: "1",
             jobId: jid,
             timeframeMin: String(goalMonths[0]),
-            timeframeMax: String(goalMonths[1]),
-            stackPrefs: stackPrefs.join(","),});
+            timeframeMax: String(goalMonths[1])});
     es.addEventListener("log", (e: any) => appendLog("C", JSON.parse(e.data).line));
     es.addEventListener("progress", (e: any) =>
       setProgress("C", JSON.parse(e.data).progress)
@@ -719,7 +701,6 @@ const onRunD = () => {
   skills,
   timeframeMin: String(goalMonths[0]),
   timeframeMax: String(goalMonths[1]),
-  stackPrefs: stackPrefs.join(","),
  });
   es.addEventListener("log", (e: any) => appendLog("D", JSON.parse(e.data).line));
   es.addEventListener("progress", (e: any) =>
@@ -754,7 +735,6 @@ const onRunE = () => {
     variants: "8,10,15",
     timeframeMin: String(goalMonths[0]),
     timeframeMax: String(goalMonths[1]),
-    stackPrefs: stackPrefs.join(","),
     pathIds: selectedPathIds.join(","),
     risk: String(riskTolerance),          // NEW
   });
@@ -878,7 +858,6 @@ const onRunF = () => {
       userId: "1",
       role,
       location,
-      stackPrefs: stackPrefs.join(","),
       targetRole: goalRole || role,
       weeklyHours: String(weeklyHours),
       yearsExp: String(yearsExp || ""),
@@ -1068,7 +1047,6 @@ const onRunF = () => {
     onChange: (v: any) => void;
   }) => {
     const items: Array<{ key: typeof active; label: string; icon?: React.ReactNode }> = [
-      { key: "plan", label: "Plan" },
       { key: "profile", label: "Profile" },
       { key: "jobs", label: "Openings" },
       { key: "results", label: "Results" },

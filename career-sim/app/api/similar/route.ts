@@ -25,8 +25,8 @@ export async function GET(req: NextRequest) {
   const uid = BigInt(new URL(req.url).searchParams.get("userId") || "1");
 
   const [row] = await prisma.$queryRaw<{ embedding: unknown }[]>`
-    SELECT embedding
-    FROM resumes
+    SELECT resume_embedding
+    FROM user_profile
     WHERE user_id = ${uid}
   `;
   if (!row?.embedding) {
@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
       (1 - VEC_COSINE_DISTANCE(jt.embedding, r.embedding) / 2.0) AS score
     FROM job_texts jt
     JOIN jobs j ON j.job_id = jt.job_id
-    CROSS JOIN (SELECT embedding FROM resumes WHERE user_id = ${uid}) AS r
+    CROSS JOIN (SELECT resume_embedding FROM user_profile WHERE user_id = ${uid}) AS r
     ORDER BY VEC_COSINE_DISTANCE(jt.embedding, r.embedding) ASC
     LIMIT 20
   `;

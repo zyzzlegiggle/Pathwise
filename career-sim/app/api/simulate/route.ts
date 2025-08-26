@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
   const jid = BigInt(jobId);
 
   // get user & job vectors
-  const [u] = await prisma.$queryRawUnsafe<any[]>(`SELECT embedding FROM resumes WHERE user_id=?`, uid.toString());
+  const [u] = await prisma.$queryRawUnsafe<any[]>(`SELECT resume_embedding FROM user_profile WHERE user_id=?`, uid.toString());
   const [j] = await prisma.$queryRawUnsafe<any[]>(`SELECT embedding FROM job_texts WHERE job_id=?`, jid.toString());
   if (!u?.embedding || !j?.embedding) return NextResponse.json({ error: "Missing embeddings" }, { status: 400 });
 

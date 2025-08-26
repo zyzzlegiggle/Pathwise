@@ -143,7 +143,6 @@ model UserGoal {
   target_role          String
   timeframe_min_months Int
   timeframe_max_months Int
-  stack_prefs          Json
   created_at           DateTime @default(now())
   updated_at           DateTime @updatedAt
 

@@ -43,7 +43,6 @@ export async function GET(req: NextRequest) {
   const resume = searchParams.get("resume") || ""; // NOTE: keep short; prefer POST for long resumes in prod.
   const timeframeMin = Number(searchParams.get("timeframeMin") || "6");
   const timeframeMax = Number(searchParams.get("timeframeMax") || "9");
-  const stackPrefs = (searchParams.get("stackPrefs") || "").split(",").filter(Boolean);
   const useLLM = searchParams.get("useLLM") === "true";
   const origin = req.nextUrl.origin;
   const targetRoleFromUI = searchParams.get("targetRole") || "";
@@ -105,16 +104,16 @@ export async function GET(req: NextRequest) {
       case "C": {
          if (!jobId) throw new Error("Missing jobId for Agent C.");
           step(15);
-          send("log", { line: `Goals: ${timeframeMin}-${timeframeMax} mo; stacks=${stackPrefs.join("/") || "any"}` });
-        const r = await fetch(`${origin}/api/gaps?userId=${userId}&jobId=${jobId}`);
+          send("log", { line: `Goals: ${timeframeMin}-${timeframeMax} mo;` });
+        // this will return missing skills?
+        const r = await fetch(`${origin}/api/gaps?userId=${userId}&jobId=${jobId}`); 
         const j = await r.json();
         const targetRoleName = searchParams.get("targetRole") || "Backend SWE";
-        const seedFromSkill = (stackPrefs[0] || "General programming");
 
         const pathExplorer = {
           bridgeSkills: (j.missing || []).slice(0, 5),
           transitions: (j.missing || []).slice(0, 5).map((s: string) => ({
-            fromSkill: seedFromSkill,
+            fromSkill: '',
             bridgeSkill: s,
             toRole: targetRoleName,
             confidence: { p25: 40, p50: 65, p75: 80 }, // placeholder heuristics; replace with model
@@ -164,11 +163,7 @@ export async function GET(req: NextRequest) {
           send("payload", { resources: {} });
           break;
         }
-        if (stackPrefs.length) {
-          const kw = stackPrefs.map((s) => s.toLowerCase());
-          skills = skills.filter((g) => kw.some((k) => g.toLowerCase().includes(k)));
-          send("log", { line: `Filtered gaps by stacks → ${skills.length} skills.` });
-        }
+
         const resources: Record<string, any[]> = {};
         let i = 0;
         for (const s of skills) {
@@ -232,7 +227,7 @@ export async function GET(req: NextRequest) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             userId, jobId: searchParams.get("jobId"), //targetRole, // targetRole optional param you may add
-            stackPrefs, gaps: skills, useLLM
+             gaps: skills, useLLM
           }),
         });
         const pj = await pr.json();
@@ -312,7 +307,6 @@ export async function GET(req: NextRequest) {
           inputs: {
             goalRole: targetRoleFromUI || "Software Engineer",
             timeframeMin, timeframeMax,
-            stackPrefs,
             targetJobTitle: targetRoleFromUI || "",
             targetLocation: targetLocQ || "",
             pathIds: (searchParams.get("pathIds") || "").split(",").filter(Boolean),
@@ -456,11 +450,10 @@ export async function GET(req: NextRequest) {
 
         // lightweight anchors from current context
         const target = searchParams.get("targetRole") || role || "Software Engineer";
-        const prefs = (searchParams.get("stackPrefs") || "").split(",").filter(Boolean);
         const currencyHint = "USD";
 
         // synthesize 3–4 anonymized receipts (replace with real retrieval later)
-        const chips = (extra: string[]) => [...new Set([target, ...prefs.slice(0,2), ...extra])];
+        const chips = (extra: string[]) => [...new Set([target])];
         
         
         const profiles = [
@@ -470,7 +463,7 @@ export async function GET(req: NextRequest) {
             pathTaken: chips(["Internal transfer", "Mentored project"]),
             timeToOffer: 12,
             compAfter1yr: 78000,
-            snippet: `2 YOE QA → contributed to backend tooling.\nBuilt 2 services in ${prefs[0] || "Go"}; internal transfer approved.`,
+            snippet: `2 YOE QA → contributed to backend tooling.\nBuilt 2 services in  "Go"; internal transfer approved.`,
             sources: [{ label: "Internal Q3 promo memo" }, { label: "Demo repo", url: "https://example.com/repo1" }],
           },
           {

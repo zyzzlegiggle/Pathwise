@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { userId = "1", targetRole, timeframeMin, timeframeMax, stackPrefs = [] } = await req.json();
+  const { userId = "1", targetRole, timeframeMin, timeframeMax = [] } = await req.json();
   const uid = BigInt(userId);
 
   const up = await prisma.userGoal.upsert({
@@ -18,13 +18,12 @@ export async function POST(req: NextRequest) {
       target_role: targetRole,
       timeframe_min_months: Number(timeframeMin),
       timeframe_max_months: Number(timeframeMax),
-      stack_prefs: stackPrefs,
+
     },
     update: {
       target_role: targetRole,
       timeframe_min_months: Number(timeframeMin),
       timeframe_max_months: Number(timeframeMax),
-      stack_prefs: stackPrefs,
     },
   });
 
