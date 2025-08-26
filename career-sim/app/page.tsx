@@ -255,11 +255,9 @@ export default function HomePage() {
   const [salaryBaseline, setSalaryBaseline] = useState<any>(null);
   const [salaryDelta, setSalaryDelta] = useState<{currency:string; medianDelta:number|null}|null>(null);
   const [citationsByJob, setCitationsByJob] = useState<Record<string, Array<{skillId:string; name:string; start:number; end:number; snippet:string}>>>({});
-  const [linkedinUrl, setLinkedinUrl] = useState("");
   const [yearsExp, setYearsExp] = useState<number | ''>('');
   const [stackInput, setStackInput] = useState("");   // comma-separated entry
   const [educationText, setEducationText] = useState("");
-  const [plans, setPlans] = useState<{id:string; title:string; createdAt:string}[]>([]);
   const [savedPaths, setSavedPaths] = useState<any[]>([]);
   const [savedSeries, setSavedSeries] = useState<any[]>([]);
   const [weeklyHours, setWeeklyHours] = useState<number>(10);
@@ -418,7 +416,6 @@ export default function HomePage() {
   const getObservedHours = (w: WeeklyPlanWeek) =>
   (w.tasks || []).reduce((sum, t) => sum + (t.done ? t.estHours : 0), 0);
 
-  const isSlip = (w: WeeklyPlanWeek) => getObservedHours(w) < w.plannedHours;
 
   function autoAdjustPlan(startWeek: number) {
     if (!weeklyPlan.length) return;
@@ -614,56 +611,6 @@ export default function HomePage() {
   setMessage(data.ok ? "Profile saved" : data.error || "Failed to save profile");
 }
 
-  async function saveCurrentPlan() {
-    const title =
-      `Plan — ${goalRole || "Target Role"} — ${new Date().toLocaleString()}`;
-
-    const res = await fetch("/api/plans", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId: "1",
-        title,
-        inputs: {
-          goalRole,
-          timeframeMin: goalMonths[0],
-          timeframeMax: goalMonths[1],
-          stackPrefs,
-          riskTolerance,                         
-          decisions: selectedDecisionIds,       
-          targetJobTitle: jobs.find(j=>j.id===selectedJobId)?.title ?? "",
-          targetLocation: jobs.find(j=>j.id===selectedJobId)?.location ?? "",
-          pathIds: selectedPathIds,
-        },
-        sources: {
-          citedJobs: citedJobIds.map((id) => {
-            const j = jobs.find((x) => x.id === id);
-            return { id, title: j?.title || "Unknown", url: j?.url || null };
-          }),
-          salarySources: [salaryTarget?.source, salaryBaseline?.source].filter(Boolean),
-        },
-        outputs: {
-          missing: selectedJobId ? (gapsByJob[selectedJobId] || []) : [],
-          paths: savedPaths,
-          series: savedSeries,
-          compareSeries,
-          decisionSummaries,  
-          salaryTarget,
-          salaryBaseline,
-          delta: salaryDelta,
-          explanation, // Agent F summary text
-        },
-      }),
-    });
-    const data = await res.json();
-    setMessage(data.ok ? `Saved plan #${data.planId}` : "Failed to save plan");
-  }
-
-  async function refreshPlans() {
-  const r = await fetch("/api/plans?userId=1");
-  const j = await r.json();
-  setPlans(j.plans || []);
-  }
 
 
 
@@ -1196,7 +1143,6 @@ const onRunF = () => {
   <DashboardShell
     actions={
       <>
-        <Button size="sm" variant="secondary" onClick={saveGoals}>Save goals</Button>
         <Button size="sm" onClick={runAll}><Play className="mr-1 h-4 w-4"/>Run pipeline</Button>
       </>
     }
@@ -1218,149 +1164,6 @@ const onRunF = () => {
 
 
         <AnimatePresence mode="wait">
-          {activeTab === "plan" && (
-            <motion.div key="tab-plan" {...fadeSlide} className="space-y-6">
-              <section className="rounded-xl border p-4">
-              <div className="flex items-center justify-between mb-2">
-                  <h2 className="text-sm font-semibold">Plan</h2>
-                  <div className="flex gap-2">
-                    <Button variant="secondary" onClick={saveGoals} size="sm">Save</Button>
-                    <Button onClick={runAll} size="sm"><Play className="mr-1 h-4 w-4"/>Run</Button>
-                  </div>
-                </div>
-              <Tabs defaultValue="goal" className="w-full">
-
-              <TabsList className="grid grid-cols-3 w-full text-xs">
-                <TabsTrigger value="goal">Goal</TabsTrigger>
-                <TabsTrigger value="prefs">Prefs</TabsTrigger>
-                <TabsTrigger value="runtime">Sim</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="goal" className="mt-4">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="sm:col-span-2">
-                    <Label className="text-sm">Target role</Label>
-                    <Input
-                      value={goalRole}
-                      onChange={(e) => setGoalRole(e.target.value)}
-                      placeholder="e.g., Backend SWE"
-                      className="mt-1"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-sm">Timeframe (months)</Label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="number" min={1}
-                        value={goalMonths[0]}
-                        onChange={(e)=> setGoalMonths([Number(e.target.value), goalMonths[1]])}
-                        className="w-24"
-                      />
-                      <span className="text-sm text-muted-foreground">to</span>
-                      <Input
-                        type="number" min={goalMonths[0]}
-                        value={goalMonths[1]}
-                        onChange={(e)=> setGoalMonths([goalMonths[0], Number(e.target.value)])}
-                        className="w-24"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="prefs" className="mt-4">
-                <Label className="text-sm">Tech focus</Label>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {["Rust","Go","Java","Python","LLM apps","Data Eng","MLOps"].map((t) => {
-                    const on = stackPrefs.includes(t);
-                    return (
-                      <Button
-                        key={t}
-                        type="button"
-                        size="sm"
-                        variant={on ? "default" : "outline"}
-                        onClick={() =>
-                          setStackPrefs((prev) => (on ? prev.filter((x) => x !== t) : [...prev, t]))
-                        }
-                      >
-                        {t}
-                      </Button>
-                    );
-                  })}
-                </div>
-                <Separator className="my-3" />
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
-                  <div className="sm:col-span-2">
-                    <Label className="text-sm">Decisions to compare</Label>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {decisions.map((d) => {
-                        const on = selectedDecisionIds.includes(d.id);
-                        return (
-                          <Button
-                            key={d.id}
-                            type="button"
-                            size="sm"
-                            variant={on ? "default" : "outline"}
-                            onClick={() =>
-                              setSelectedDecisionIds((prev) =>
-                                on ? prev.filter((x) => x !== d.id) : [...prev, d.id].slice(0, 3)
-                              )
-                            }
-                            title={d.description}
-                          >
-                            {d.label}
-                          </Button>
-                        );
-                      })}
-                    </div>
-                    <p className="text-[11px]  text-muted-foreground mt-1">Pick up to 3.</p>
-                  </div>
-
-                  <div>
-                    <Label className="text-sm">Risk tolerance</Label>
-                    <div className="mt-2">
-                      <Slider
-                        value={[riskTolerance]}
-                        min={1}
-                        max={3}
-                        step={1}
-                        onValueChange={(v) => setRiskTolerance((v[0] ?? 2) as 1 | 2 | 3)}
-                      />
-                      <div className="flex justify-between text-[11px] text-muted-foreground mt-1">
-                        <span>Safe</span><span>Balanced</span><span>Aggressive</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-              </TabsContent>
-
-              <TabsContent value="runtime" className="mt-4">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="sm:col-span-2">
-                    <HoursSlider value={weeklyHours} onChange={(v)=> setWeeklyHours(v)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm">Target qualification</Label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="number" min={50} max={100}
-                        value={targetThreshold}
-                        onChange={(e)=> setTargetThreshold(Number(e.target.value))}
-                        className="w-24"
-                      />
-                      <span className="text-sm text-muted-foreground">%</span>
-                    </div>
-                  </div>
-                </div>
-                <p className="text-[11px]  text-muted-foreground mt-2">
-                  We’ll draw a goal line at the target qualification and overlay scenarios (8/10/15h).
-                </p>
-              </TabsContent>
-            </Tabs>
-              </section>
-            </motion.div>
-          )}
 
           {activeTab === "profile" && (
             <motion.div key="tab-profile" {...fadeSlide} className="space-y-6">
@@ -2114,46 +1917,6 @@ const onRunF = () => {
                           </div>
                         </div>
                       )}
-
-                      {plans.length > 0 && (
-                      <section className="rounded-xl border p-4 space-y-2 mt-3">
-                        <h3 className="text-sm font-semibold">My Plans</h3>
-                        <ul className="space-y-1 text-sm">
-                          {plans.map((p) => (
-                            <li key={p.id} className="flex items-center justify-between">
-                              <span>{p.title}</span>
-                              <div className="flex gap-2">
-                                <a
-                                  href={`/api/export?planId=${p.id}&format=md`}
-                                  className="underline"
-                                  target="_blank"
-                                  rel="noreferrer"
-                                >
-                                  Export .md
-                                </a>
-                                <a
-                                  href={`/api/export?planId=${p.id}&format=pdf`}
-                                  className="underline"
-                                  target="_blank"
-                                  rel="noreferrer"
-                                >
-                                  Export .pdf
-                                </a>
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
-                        <div className="flex gap-2">
-                          <Button onClick={saveCurrentPlan}>Save plan</Button>
-                          {plans.length === 0 ? (
-                            <Button variant="outline" onClick={refreshPlans}>Load My Plans</Button>
-                          ) : null}
-                        </div>
-                      </section>
-                    )}
-
-
-
                     </CardContent>
                   </Card>
                 );

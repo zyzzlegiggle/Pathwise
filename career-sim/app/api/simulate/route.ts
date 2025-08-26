@@ -25,20 +25,20 @@ const jtFull = await prisma.jobText.findUnique({
 });
 const jobDesc = (jtFull?.description ?? "").toLowerCase();
 
-const catalog = await prisma.skillCatalog.findMany({
-  select: { skill_name: true, aliases: true },
+const catalog = await prisma.skillNode.findMany({
+  select: { name: true, aliases: true },
 });
 
 const missingSkills: string[] = [];
 for (const s of catalog) {
   const aliases: string[] = Array.isArray(s.aliases) ? (s.aliases as any) : [];
-  const names = [s.skill_name, ...aliases]
+  const names = [s.name, ...aliases]
     .filter((x): x is string => typeof x === "string")
     .map((x) => x.toLowerCase());
 
   const userHas = names.some((n) => userSkillNames.has(n));
   const mentioned = names.some((n) => jobDesc.includes(n));
-  if (!userHas && mentioned) missingSkills.push(s.skill_name);
+  if (!userHas && mentioned) missingSkills.push(s.name);
 }
 
 // AFTER you compute missingSkills[] (current logic), filter by path if provided
@@ -82,7 +82,7 @@ for (const skill of targetMissing) {
 // 3) simulate weekly progress consuming hours
 const weeks = Math.max(4, Math.min(52, Number(weeksOverride ?? 12)));
 const perSkillBump = gaps.length > 0 ? 0.6 / gaps.length : 0;
-let steps: { week: number; score: number }[] = [];
+let steps: { week: number; score: number; prob: number }[] = [];
 // base score from cosine similarity
 const [{ d }] = await prisma.$queryRawUnsafe<any[]>(
   "SELECT VEC_COSINE_DISTANCE(?, ?) AS d",
