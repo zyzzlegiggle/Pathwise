@@ -281,7 +281,7 @@ def import_skills(
         rows = read_skills_from_csv(str(path))
         result = insert_skills(
             rows,
-            batch_size=10,
+            batch_size=50,
             max_retries=5,
             start_index=start_from,
             use_checkpoint=resume and (start_from is None),

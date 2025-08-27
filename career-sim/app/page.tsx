@@ -32,7 +32,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { Label } from "@/components/ui/label";
@@ -263,7 +262,6 @@ export default function HomePage() {
   const [weeklyHours, setWeeklyHours] = useState<number>(10);
   const [activeSeries, setActiveSeries] = useState<string[]>([]);   // which series are visible
   const [targetThreshold, setTargetThreshold] = useState<number>(75); // goal line on chart
-  const [activeTab, setActiveTab] = useState<"profile"|"jobs"|"results"|"orchestrator">("profile");
   const [jobsPage, setJobsPage] = useState(1);
   const [riskTolerance, setRiskTolerance] = useState<1 | 2 | 3>(2); // 1=safe,2=balanced,3=aggressive
   const [decisions, setDecisions] = useState<DecisionOption[]>([
@@ -893,8 +891,7 @@ const onRunF = () => {
   setTimeout(() => onRunH(), 4400);
 };
 
-  // derived
-  const topJob = useMemo(() => jobs[0], [jobs]);
+
 
   // compact circular score pill for job cards
   const ScorePill: React.FC<{ score: number }> = ({ score }) => {
@@ -969,9 +966,6 @@ const onRunF = () => {
                 <Button size="sm" variant="secondary" onClick={() => analyzeGaps(job.id)} disabled={loading}>
                   Analyze gaps
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => simulate(job.id)} disabled={loading}>
-                  Simulate
-                </Button>
                 <Button
                   size="sm"
                   variant={selectedJobId === job.id ? "default" : "outline"}
@@ -1040,47 +1034,13 @@ const onRunF = () => {
 
   };
 
-  // Alightweight dashboard shell + sidebar nav
-  const SidebarNav = ({
-    active,
-    onChange,
-  }: {
-    active: string;
-    onChange: (v: any) => void;
-  }) => {
-    const items: Array<{ key: typeof active; label: string; icon?: React.ReactNode }> = [
-      { key: "profile", label: "Profile" },
-      { key: "jobs", label: "Openings" },
-      { key: "results", label: "Results" },
-      { key: "orchestrator", label: "Orchestrator" },
-    ];
-    return (
-      <nav className="p-3 space-y-1">
-        {items.map((i) => (
-          <button
-            key={i.key}
-            onClick={() => onChange(i.key as any)}
-            className={[
-              "w-full text-left px-3 py-2 rounded-lg text-sm transition",
-              active === i.key
-                ? "bg-primary/10 text-primary"
-                : "hover:bg-muted text-muted-foreground",
-            ].join(" ")}
-            aria-current={active === i.key ? "page" : undefined}
-          >
-            {i.label}
-          </button>
-        ))}
-      </nav>
-    );
-  };
 
   const DashboardShell: React.FC<{
     title?: string;
     actions?: React.ReactNode;
-    sidebar?: React.ReactNode; 
+    sidebar?: React.ReactNode; // ← can keep prop for compatibility but we won't render it
     children: React.ReactNode;
-  }> = ({ title = "Career Clone", actions, sidebar, children }) => (
+  }> = ({ title = "Career Clone", actions, children }) => (
     <div className="mx-auto max-w-6xl">
       <header className="sticky top-0 z-30 bg-background/80 backdrop-blur border-b">
         <div className="px-5 py-3 flex items-center justify-between">
@@ -1089,16 +1049,12 @@ const onRunF = () => {
         </div>
       </header>
 
-      <div className="grid grid-cols-12">
-        <aside className="col-span-12 md:col-span-3 lg:col-span-2 border-r min-h-[calc(100vh-49px)]">
-          {sidebar /* ← render your nav here */}
-        </aside>
-        <section className="col-span-12 md:col-span-9 lg:col-span-10 p-5">
-          {children /* ← main area gets built-in padding */}
-        </section>
-      </div>
+      <section className="p-5 space-y-6">
+        {children}
+      </section>
     </div>
   );
+
 
   // compact KPI strip (stat cards)
   const KPICard = ({ label, value, hint }: { label: string; value: React.ReactNode; hint?: string }) => (
@@ -1117,19 +1073,24 @@ const onRunF = () => {
     </div>
   );
 
+  const Section: React.FC<{ title: string; defaultOpen?: boolean; actions?: React.ReactNode; children: React.ReactNode }> = ({ title, defaultOpen = true, actions, children }) => {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="rounded-xl border">
+      <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between px-4 py-3">
+        <h2 className="text-sm font-semibold">{title}</h2>
+        <div className="flex items-center gap-2">{actions}</div>
+      </button>
+      <Separator />
+      {open ? <div className="p-4 space-y-4">{children}</div> : null}
+    </div>
+  );
+};
+
 
   return (
     <main>
-  <DashboardShell
-    actions={
-      <>
-        <Button size="sm" onClick={runAll}><Play className="mr-1 h-4 w-4"/>Run pipeline</Button>
-      </>
-    }
-    sidebar={
-      <SidebarNav active={activeTab} onChange={(v) => setActiveTab(v as any)} />
-    }
-  >
+  <DashboardShell actions={ <> <Button size="sm" onClick={runAll}><Play className="mr-1 h-4 w-4"/>Run pipeline</Button> </> }>
     {/* inject sidebar nav that controls activeTab */}
 
               {/* KPI strip – small, glanceable */}
@@ -1142,15 +1103,9 @@ const onRunF = () => {
 
       <section className="col-span-12 md:col-span-9 lg:col-span-10 space-y-6">
 
-
-        <AnimatePresence mode="wait">
-
-          {activeTab === "profile" && (
-            <motion.div key="tab-profile" {...fadeSlide} className="space-y-6">
-              {/* Resume uploader + Profile */}
+        <Section title="Your Profile" defaultOpen>
+            {/* Resume uploader + Profile */}
               <section className="rounded-xl border p-4 space-y-3">
-                <h2 className="text-sm font-semibold">Your Profile</h2>
-                {/* Paste Resume (unchanged component) */}
                 <div className="space-y-2">
                   <label className="block text-sm font-medium">Resume</label>
                   <Textarea
@@ -1158,7 +1113,7 @@ const onRunF = () => {
                     onChange={(e: any) => setResume(e.target.value)}
                     placeholder="Write your resume here..."
                     className="h-40"
-
+                    
                   />
                   
                 </div>
@@ -1193,11 +1148,21 @@ const onRunF = () => {
               <Button variant="secondary" onClick={saveProfile}>Save profile</Button>
             </div>
               </section>
-            </motion.div>
-          )}
+          </Section>
 
-          {activeTab === "jobs" && (
-            <motion.div key="tab-jobs" {...fadeSlide} className="space-y-6">
+
+        <Section
+          title="Find Openings"
+          defaultOpen
+          actions={
+            <div className="flex gap-2">
+              <Button onClick={fetchJobs} disabled={loading} size="sm" variant="secondary">
+                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Fetch
+              </Button>
+              <Button onClick={findSimilar} disabled={loading} size="sm" variant="outline">Similar</Button>
+            </div>
+          }
+        >
               {/* Job Finder controls */}
               <section className="rounded-xl border p-4 space-y-3">
                 <div className="flex items-center justify-between">
@@ -1299,11 +1264,9 @@ const onRunF = () => {
               {!jobs.length && (
                 <EmptyState title="No openings yet" hint="Try Fetch or adjust role/location." />
               )}
-            </motion.div>
-          )}
+        </Section>
 
-          {activeTab === "results" && (
-            <motion.div key="tab-results" {...fadeSlide} className="space-y-6">
+        <Section title="Decision Duel — Outcome Bands" defaultOpen={Boolean(Object.keys(compareSeries).length)}>
               {Object.keys(compareSeries).length > 0 && (
                 <section className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -1507,162 +1470,85 @@ const onRunF = () => {
                   </p>
                 </section>
               )}
+        </Section>
 
-
-              {weeklyPlan.length > 0 && (
-                <section className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-sm font-semibold">Week-by-Week Plan</h2>
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline" onClick={() => setCurrentWeek(Math.max(1, currentWeek - 1))}>Prev</Button>
-                      <Button size="sm" variant="outline" onClick={() => setCurrentWeek(Math.min(weeklyPlan.length, currentWeek + 1))}>Next</Button>
-                      <Button size="sm" onClick={() => autoAdjustPlan(currentWeek)}>Auto-adjust from Week {currentWeek}</Button>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-3">
-                    {weeklyPlan.map((w) => {
-                      const observed = getObservedHours(w);
-                      const slip = observed < w.plannedHours;
-                      return (
-                        <Card key={w.week} className={w.week === currentWeek ? "ring-2 ring-primary" : ""}>
-                          <CardHeader className="py-3 flex flex-row items-center justify-between">
-                            <div className="space-y-1">
-                              <CardTitle className="text-base">Week {w.week}</CardTitle>
-                              <div className="text-[11px]  text-muted-foreground">
-                                Planned {w.plannedHours}h • Observed {observed}h
-                                {w.carriesOverFrom ? ` • Carry-over from week ${w.carriesOverFrom}` : ""}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {w.checkpoint ? <Badge variant="secondary">Checkpoint</Badge> : null}
-                              {slip ? <Badge variant="destructive">Behind</Badge> : <Badge variant="outline">On track</Badge>}
-                            </div>
-                          </CardHeader>
-                          <CardContent className="space-y-3">
-                            <Progress value={Math.min(100, (observed / Math.max(1, w.plannedHours)) * 100)} />
-                            {w.checkpoint && (
-                              <div className="rounded-lg border p-2 text-xs">
-                                <div className="font-medium">{w.checkpoint.title}</div>
-                                <div className="text-muted-foreground">{w.checkpoint.criteria}</div>
-                              </div>
-                            )}
-                            <div className="space-y-2">
-                              {(w.tasks || []).map((t) => (
-                                <div key={t.id} className="flex items-center justify-between rounded-lg border p-2">
-                                  <div className="flex items-center gap-2">
-                                    <Checkbox checked={!!t.done} onCheckedChange={() => toggleTask(w.week, t.id)} />
-                                    <div>
-                                      <div className="text-sm">{t.title}</div>
-                                      <div className="text-[11px]  text-muted-foreground">
-                                        {t.skill ? `${t.skill} • ` : ""}{t.estHours}h • {t.priority.toUpperCase()}
-                                        {t.url ? <> • <a className="underline" href={t.url} target="_blank" rel="noreferrer">resource</a></> : null}
-                                      </div>
-                                    </div>
-                                  </div>
-                                  {t.done ? <Badge variant="secondary">Done</Badge> : null}
-                                </div>
-                              ))}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                </section>
-              )}
-
-              {/* Simulation chart + controls (move your whole simulation section here) */}
-              {(multiSeries.length > 0 || simSteps.length > 0) ? (
-                <section className="space-y-3">
-                  {/* keep your existing HoursSlider + Re-simulate + chart */}
-                  <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold">
-                  Simulation — Qualification vs Weeks {selectedJobId ? `(Job #${selectedJobId})` : ""}
-                </h2>
-                <div className="flex items-center gap-3">
-                  <HoursSlider value={weeklyHours} onChange={(v)=> setWeeklyHours(v)} />
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      // re-run E with hours variants around selection for comparison
-                      setSelectedPathIds((p) => p.slice(0, 3));
-                      onRunE();
-                    }}
-                  >
-                    Re-simulate
-                  </Button>
+        <Section title="Week-by-Week Plan" defaultOpen={Boolean(weeklyPlan.length)} actions={
+          weeklyPlan.length ? (
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => setCurrentWeek(Math.max(1, currentWeek - 1))}>Prev</Button>
+              <Button size="sm" variant="outline" onClick={() => setCurrentWeek(Math.min(weeklyPlan.length, currentWeek + 1))}>Next</Button>
+              <Button size="sm" onClick={() => autoAdjustPlan(currentWeek)}>Auto-adjust from Week {currentWeek}</Button>
+            </div>
+          ) : null
+        }>
+          {weeklyPlan.length > 0 && (
+            <section className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold">Week-by-Week Plan</h2>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setCurrentWeek(Math.max(1, currentWeek - 1))}>Prev</Button>
+                  <Button size="sm" variant="outline" onClick={() => setCurrentWeek(Math.min(weeklyPlan.length, currentWeek + 1))}>Next</Button>
+                  <Button size="sm" onClick={() => autoAdjustPlan(currentWeek)}>Auto-adjust from Week {currentWeek}</Button>
                 </div>
               </div>
 
-              {/* Series toggles */}
-              <div className="flex flex-wrap gap-2">
-                {(multiSeries.length ? multiSeries.map(s => s.label) : ["Match score","Qualification probability"]).map((label) => {
-                  const on = activeSeries.includes(label);
+              <div className="grid gap-3">
+                {weeklyPlan.map((w) => {
+                  const observed = getObservedHours(w);
+                  const slip = observed < w.plannedHours;
                   return (
-                    <Button
-                      key={label}
-                      size="sm"
-                      variant={on ? "default" : "outline"}
-                      onClick={() =>
-                        setActiveSeries((prev) =>
-                          prev.includes(label) ? prev.filter((l) => l !== label) : [...prev, label]
-                        )
-                      }
-                    >
-                      {on ? <BadgeCheck className="mr-1 h-4 w-4" /> : null}
-                      {label}
-                    </Button>
+                    <Card key={w.week} className={w.week === currentWeek ? "ring-2 ring-primary" : ""}>
+                      <CardHeader className="py-3 flex flex-row items-center justify-between">
+                        <div className="space-y-1">
+                          <CardTitle className="text-base">Week {w.week}</CardTitle>
+                          <div className="text-[11px]  text-muted-foreground">
+                            Planned {w.plannedHours}h • Observed {observed}h
+                            {w.carriesOverFrom ? ` • Carry-over from week ${w.carriesOverFrom}` : ""}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {w.checkpoint ? <Badge variant="secondary">Checkpoint</Badge> : null}
+                          {slip ? <Badge variant="destructive">Behind</Badge> : <Badge variant="outline">On track</Badge>}
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <Progress value={Math.min(100, (observed / Math.max(1, w.plannedHours)) * 100)} />
+                        {w.checkpoint && (
+                          <div className="rounded-lg border p-2 text-xs">
+                            <div className="font-medium">{w.checkpoint.title}</div>
+                            <div className="text-muted-foreground">{w.checkpoint.criteria}</div>
+                          </div>
+                        )}
+                        <div className="space-y-2">
+                          {(w.tasks || []).map((t) => (
+                            <div key={t.id} className="flex items-center justify-between rounded-lg border p-2">
+                              <div className="flex items-center gap-2">
+                                <Checkbox checked={!!t.done} onCheckedChange={() => toggleTask(w.week, t.id)} />
+                                <div>
+                                  <div className="text-sm">{t.title}</div>
+                                  <div className="text-[11px]  text-muted-foreground">
+                                    {t.skill ? `${t.skill} • ` : ""}{t.estHours}h • {t.priority.toUpperCase()}
+                                    {t.url ? <> • <a className="underline" href={t.url} target="_blank" rel="noreferrer">resource</a></> : null}
+                                  </div>
+                                </div>
+                              </div>
+                              {t.done ? <Badge variant="secondary">Done</Badge> : null}
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
                   );
                 })}
               </div>
+            </section>
+          )}
+        </Section>
 
-              <div className="w-full h-72 rounded-lg border p-3">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart
-                    data={(multiSeries[0]?.steps || simSteps).map((row, idx) => {
-                      const base: Record<string, any> = { week: row.week, score: row.score, prob: row.prob };
-                      multiSeries.forEach((s, si) => { base[s.label] = s.steps[idx]?.score ?? null; });
-                      return base;
-                    })}
-                  >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="week" />
-                  <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
-                  <Tooltip formatter={(val: any) => (val == null ? "—" : `${val}%`)} labelFormatter={(l) => `Week ${l}`} />
-                  <ReferenceLine y={targetThreshold} strokeDasharray="4 4" label={`${targetThreshold}%`} />
-                  {multiSeries.length > 0 ? (
-                    multiSeries.map((s) =>
-                      activeSeries.includes(s.label) ? (
-                        <Line key={s.label} type="monotone" dataKey={s.label} name={s.label} dot={false} strokeWidth={2} />
-                      ) : null
-                    )
-                  ) : (
-                    <>
-                      {activeSeries.includes("Match score") && (
-                        <Line type="monotone" dataKey="score" name="Match score" dot={false} strokeWidth={2} />
-                      )}
-                      {activeSeries.includes("Qualification probability") && (
-                        <Line type="monotone" dataKey="prob" name="Qualification probability" dot={false} strokeWidth={2} />
-                      )}
-                    </>
-                  )}
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-              <p className="text-[11px]  text-muted-foreground">
-                The dashed line marks your target qualification ({targetThreshold}%). Toggle series to compare scenarios.
-              </p>
-
-                </section>
-              ) : (
-                <Card className="p-6">
-                  <p className="text-sm text-muted-foreground">
-                    Run a simulation from the Jobs tab to see projected qualification over time.
-                  </p>
-                </Card>
-              )}
-
+        <Section title="People Like Me — Receipts" defaultOpen={Boolean(similarReceipts.length)} actions={
+          similarReceipts.length ? <Button size="sm" variant="outline" onClick={onRunH}>Refresh</Button> : null
+        }>
+            
             {similarReceipts.length > 0 && (
               <section className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -1718,202 +1604,19 @@ const onRunF = () => {
               </section>
             )}
 
-            
-
-            </motion.div>
-          )}
-
-          {activeTab === "orchestrator" && (
-            <motion.div key="tab-orchestrator" {...fadeSlide} className="space-y-6">
-              {/* Inline Orchestrator: convert Dialog to inline card for tab view */}
-              <section className="rounded-xl border">
-                <div className="p-4 flex items-center justify-between">
-                  <h2 className="text-sm font-semibold">Agent Orchestrator</h2>
-                  <div className="flex gap-2">
-                    <Button variant="secondary" onClick={resetAgents}>Reset</Button>
-                    <Button onClick={runAll}>Run all (A→F)</Button>
-                  </div>
-                </div>
-                <Separator />
-                <ScrollArea className="max-h-[70vh] p-4">
-    <div className="grid gap-3">
-              {AGENTS.map((a) => {
-                const s = agents[a.key];
-                return (
-                  <Card key={a.key} className="shadow-sm">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0">
-                      <div className="space-y-1">
-                        <CardTitle className="text-base">
-                          Agent {a.key} — {a.title}
-                        </CardTitle>
-                        <p className="text-[11px]  text-muted-foreground">{a.subtitle}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          variant={
-                            s.status === "done"
-                              ? "default"
-                              : s.status === "running"
-                              ? "secondary"
-                              : s.status === "error"
-                              ? "destructive"
-                              : "outline"
-                          }
-                        >
-                          {s.status.toUpperCase()}
-                        </Badge>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={
-                            a.key === "A" ? onRunA
-                            : a.key === "B" ? onRunB
-                            : a.key === "C" ? onRunC
-                            : a.key === "D" ? onRunD
-                            : a.key === "E" ? onRunE
-                            : a.key === "F" ? onRunF
-                            : a.key === "G" ? onRunG
-                            : onRunH
-                          }
-                        >
-                          Run this agent
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <Progress value={s.progress} />
-                      <div className="rounded-lg bg-muted p-2 text-xs max-h-28 overflow-auto leading-relaxed">
-                        {s.log.length ? (
-                          s.log.map((line, i) => <div key={i}>• {line}</div>)
-                        ) : (
-                          <div className="text-muted-foreground">No logs yet.</div>
-                        )}
-                      </div>
-
-                      {/* Small dynamic bits per agent */}
-                      {a.key === "B" && jobs.length > 0 && (
-                        <div className="text-xs">
-                          <span className="font-semibold">Top match:</span>{" "}
-                          {topJob?.title} @ {topJob?.company} —{" "}
-                          {(topJob!.score * 100).toFixed(1)}%
-                        </div>
-                      )}
-                      {a.key === "C" && topJob && clusterInfo && (
-                        <div className="text-xs">
-                          <span className="font-semibold">Role cluster:</span> {clusterInfo.name} ({(clusterInfo.sim*100).toFixed(1)}%)
-                        </div>
-                      )}
-                      {a.key === "C" && topJob && (
-                        <div className="text-xs">
-                          <span className="font-semibold">Gaps ({(gapsByJob[topJob.id]?.length ?? 0)}):</span>{" "}
-                          {gapsByJob[topJob.id]?.slice(0, 6).join(", ") ||
-                            "—"}
-                        </div>
-                      )}
-                      
-                      {a.key === "D" && paths.length > 0 && (
-                        <div className="text-xs space-y-2">
-                          <div className="font-semibold">Paths</div>
-                          <div className="flex flex-wrap gap-2">
-                            {paths.map((p) => {
-                              const on = selectedPathIds.includes(p.pathId);
-                              return (
-                                <Button
-                                  key={p.pathId}
-                                  size="sm"
-                                  variant={on ? "default" : "outline"}
-                                  onClick={() =>
-                                    setSelectedPathIds((prev) =>
-                                      on ? prev.filter((id) => id !== p.pathId) : [...prev, p.pathId]
-                                    )
-                                  }
-                                >
-                                  {p.name}
-                                </Button>
-                              );
-                            })}
-                          </div>
-                          <div className="text-muted-foreground">
-                            Tip: select 1–3 paths, then run Agent E.
-                          </div>
-                        </div>
-                      )}
-
-                      {a.key === "F" && explanation && (
-                        <pre className="text-xs whitespace-pre-wrap">{explanation}</pre>
-                      )}
-                      {a.key === "F" && (salaryTarget || salaryBaseline) && (
-                        <div className="text-xs grid gap-1">
-                          {salaryTarget && (
-                            <div>
-                              <span className="font-semibold">Target salary (median):</span>{" "}
-                              {salaryTarget.currency} {salaryTarget.median?.toLocaleString() ?? "—"}
-                              {salaryTarget.p25 && salaryTarget.p75
-                                ? `  (p25 ${salaryTarget.p25.toLocaleString()} • p75 ${salaryTarget.p75.toLocaleString()})`
-                                : ""}
-                              <span className="text-muted-foreground"> — {salaryTarget.source}</span>
-                            </div>
-                          )}
-                          {salaryBaseline && (
-                            <div>
-                              <span className="font-semibold">Baseline (median):</span>{" "}
-                              {salaryBaseline.currency} {salaryBaseline.median?.toLocaleString() ?? "—"}
-                              <span className="text-muted-foreground"> — {salaryBaseline.source}</span>
-                            </div>
-                          )}
-                          {salaryDelta && salaryDelta.medianDelta != null && (
-                            <div>
-                              <span className="font-semibold">Estimated delta:</span>{" "}
-                              {salaryDelta.currency} {salaryDelta.medianDelta.toLocaleString()}
-                            </div>
-                          )}
-                          {decisionSummaries.length > 0 && (
-                            <div className="text-[11px] text-muted-foreground">
-                              {decisionSummaries.map((s) => (
-                                <div key={`sum-${s.decisionId}`}>
-                                  {decisions.find(d=>d.id===s.decisionId)?.label}:{" "}
-                                  {s.cohortSize ? `${s.cohortSize} similar profiles` : "cohort unknown"}
-                                  {s.riskNotes ? ` — ${s.riskNotes}` : ""}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      {a.key === "F" && selectedJobId && citationsByJob[selectedJobId]?.length > 0 && (
-                        <div className="text-xs">
-                          <div className="font-semibold mb-1">Evidence from job description:</div>
-                          <div className="flex flex-wrap gap-2">
-                            {citationsByJob[selectedJobId].map((c, i) => (
-                              <TooltipShadcn key={`${c.skillId}-${i}`}>
-                                <TooltipTrigger asChild>
-                                  <Badge variant="secondary">{c.name}</Badge>
-                                </TooltipTrigger>
-                                <TooltipContent className="max-w-xs whitespace-pre-wrap">
-                                  <p className="text-[11px] leading-snug">{c.snippet}</p>
-                                </TooltipContent>
-                              </TooltipShadcn>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-                </ScrollArea>
-              </section>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        </Section>
 
         {/* subtle global message */}
         {message && (
           <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm">{message}</div>
         )}
       </section>
-
+      <button
+        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+        className="fixed bottom-4 right-4 rounded-full shadow-lg border bg-background px-4 py-2 text-xs"
+      >
+        ↑ Top
+      </button>
   </DashboardShell>
 </main>
 
