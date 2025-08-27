@@ -3,14 +3,15 @@ import pymysql
 from pymysql.err import OperationalError
 from typing import List, Optional, Iterable, Tuple
 import csv, json, os, pathlib
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
+
 # ---- Logging setup ----
 logging.basicConfig(
-    level=logging.INFO,   # change to DEBUG for more verbosity
+    level=logging.DEBUG,   # change to DEBUG for more verbosity
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger("skills_import")
@@ -27,6 +28,41 @@ DB_USER = os.getenv("DB_USER", "root")
 DB_PASS = os.getenv("DB_PASS", "")
 DB_NAME = os.getenv("DB_NAME", "mydb")               # change to your DB
 CA_PATH = os.getenv("OS_PATH", "")
+CHECKPOINT_PATH = os.getenv("CHECKPOINT_PATH", "skills_import.state")
+
+from google.cloud import storage
+
+CHECKPOINT_BUCKET = os.getenv("CHECKPOINT_BUCKET", "")
+CHECKPOINT_BLOB = os.getenv("CHECKPOINT_BLOB", "skills_import.state")
+
+storage_client = storage.Client()
+
+def read_checkpoint() -> int:
+    if not CHECKPOINT_BUCKET:
+        return 0
+    try:
+        bucket = storage_client.bucket(CHECKPOINT_BUCKET)
+        blob = bucket.blob(CHECKPOINT_BLOB)
+        if not blob.exists():
+            return 0
+        data = blob.download_as_text(encoding="utf-8").strip()
+        return int(data)
+    except Exception as e:
+        logger.warning(f"Failed to read checkpoint from GCS: {e}")
+        return 0
+
+def write_checkpoint(n: int) -> None:
+    if not CHECKPOINT_BUCKET:
+        return
+    try:
+        bucket = storage_client.bucket(CHECKPOINT_BUCKET)
+        blob = bucket.blob(CHECKPOINT_BLOB)
+        blob.upload_from_string(str(n), content_type="text/plain")
+        logger.debug(f"Wrote checkpoint {n} to gs://{CHECKPOINT_BUCKET}/{CHECKPOINT_BLOB}")
+    except Exception as e:
+        logger.error(f"Failed to write checkpoint to GCS: {e}")
+
+
 # ---------- DB connection with timeouts ----------
 def get_conn():
     logger.debug(f"Connecting to DB {DB_HOST}:{DB_PORT}/{DB_NAME} as {DB_USER}")
@@ -80,43 +116,72 @@ def generate_embedding(name: str, aliases_json: Optional[str]) -> List[float]:
         contents=text,
         config=types.EmbedContentConfig(output_dimensionality=768)
     )
-    return result.embeddings
+    return result.embeddings[0].values
 
 # ---------- robust batch insert with retries ----------
-def insert_skills(rows: List[tuple], batch_size: int = 200, max_retries: int = 5) -> dict:
+def insert_skills(
+    rows: List[tuple],
+    batch_size: int = 50,
+    max_retries: int = 5,
+    start_index: Optional[int] = None,
+    use_checkpoint: bool = True,
+) -> dict:
     total = len(rows)
     if total == 0:
         logger.info("No rows to insert.")
         return {"inserted": 0, "batches": 0}
 
+    # upsert SQL (see section above)
     sql = """
         INSERT INTO skill_node (name, parent_id, aliases, embedding)
         VALUES (%s, NULL, %s, %s)
+        ON DUPLICATE KEY UPDATE
+          aliases = VALUES(aliases),
+          embedding = VALUES(embedding)
     """
+
+    # figure out where to start
+    offset = (
+        start_index if start_index is not None
+        else (read_checkpoint() if use_checkpoint else 0)
+    )
+    if offset < 0 or offset > total:
+        offset = 0
+    if offset:
+        logger.info(f"Resuming from row index {offset} (0-based)")
+
+    # slice the worklist
+    rows_to_process = rows[offset:]
+    if not rows_to_process:
+        logger.info("Nothing to do from the given starting point.")
+        return {"inserted": 0, "batches": 0, "start_index": offset}
 
     inserted_total = 0
     batch_index = 0
     t0 = time.time()
-    logger.info(f"Starting insert of {total} rows in batches of {batch_size}")
+    logger.info(f"Starting insert of {len(rows_to_process)} rows in batches of {batch_size}")
 
-    for batch in chunked(rows, batch_size):
+    for batch in chunked(rows_to_process, batch_size):
         batch_index += 1
-        logger.info(f"Preparing batch {batch_index} ({len(batch)} rows)...")
+        global_start = offset + (batch_index - 1) * batch_size
+        global_end_excl = global_start + len(batch)
+        logger.info(f"Preparing batch {batch_index} for rows [{global_start}:{global_end_excl}) ...")
 
         # Precompute embeddings
         t_emb0 = time.time()
         payload = []
         for name, aliases_json in batch:
             emb = generate_embedding(name, aliases_json)
-            emb_str = "[" + ",".join(str(x) for x in emb) + "]"
+            emb_str = json.dumps(emb)
             payload.append((name, aliases_json, emb_str))
         t_emb1 = time.time()
         logger.debug(f"Batch {batch_index} embeddings computed in {t_emb1 - t_emb0:.2f}s")
 
-        # Now insert this batch with retry
+        # Insert with retry
         attempt = 0
         while True:
             attempt += 1
+            conn = None
             try:
                 conn = get_conn()
                 conn.ping(reconnect=True)
@@ -124,20 +189,29 @@ def insert_skills(rows: List[tuple], batch_size: int = 200, max_retries: int = 5
                     cur.executemany(sql, payload)
                     affected = cur.rowcount
                 conn.commit()
-                conn.close()
+                if conn:
+                    conn.close()
 
                 inserted_total += affected
                 logger.info(
-                    f"✅ Batch {batch_index}: inserted {affected}/{len(batch)} rows "
-                    f"(progress {inserted_total}/{total})"
+                    f"✅ Batch {batch_index}: upserted {affected}/{len(batch)} rows "
+                    f"(progress rows [{global_start}:{global_end_excl}), total upserts so far {inserted_total})"
                 )
+
+                # ✅ update checkpoint AFTER successful commit
+                if use_checkpoint:
+                    write_checkpoint(global_end_excl)
+                    logger.debug(f"Wrote checkpoint at row index {global_end_excl}")
                 break
+
             except Exception as e:
-                try:
-                    conn.rollback()
-                    conn.close()
-                except Exception:
-                    pass
+                # best-effort cleanup
+                if conn:
+                    try:
+                        conn.rollback()
+                        conn.close()
+                    except Exception:
+                        pass
 
                 if is_transient_mysql_err(e) and attempt <= max_retries:
                     backoff = min(60, (2 ** (attempt - 1))) + random.random()
@@ -152,9 +226,14 @@ def insert_skills(rows: List[tuple], batch_size: int = 200, max_retries: int = 5
                     raise
 
     logger.info(
-        f"All done. Inserted {inserted_total} rows in {time.time() - t0:.2f}s across {batch_index} batches."
+        f"All done. Upserted {inserted_total} rows in {time.time() - t0:.2f}s across {batch_index} batches."
     )
-    return {"inserted": inserted_total, "batches": batch_index}
+    return {
+        "inserted": inserted_total,
+        "batches": batch_index,
+        "start_index": offset,
+        "end_index": offset + len(rows_to_process),
+    }
 
 def read_skills_from_csv(csv_path: str) -> List[tuple]:
     logger.info(f"Reading CSV from {csv_path} ...")
@@ -188,7 +267,10 @@ def read_skills_from_csv(csv_path: str) -> List[tuple]:
 
 # ---- API ----
 @app.post("/import-skills")
-def import_skills():
+def import_skills(
+    resume: bool = Query(default=True, description="Resume from checkpoint"),
+    start_from: Optional[int] = Query(default=None, description="0-based row index to start from (overrides resume)")
+):
     path = pathlib.Path(CSV_PATH)
     logger.info(f"Received request to import skills from {path}")
     if not path.exists():
@@ -197,19 +279,25 @@ def import_skills():
 
     try:
         rows = read_skills_from_csv(str(path))
-        result = insert_skills(rows)
+        result = insert_skills(
+            rows,
+            batch_size=10,
+            max_retries=5,
+            start_index=start_from,
+            use_checkpoint=resume and (start_from is None),
+        )
         logger.info("Import complete")
         return {
             "csv_path": str(path),
             "rows_read": len(rows),
             "inserted": result["inserted"],
-            "skipped_empty_names": 0,
+            "start_index": result.get("start_index"),
+            "end_index": result.get("end_index"),
             "message": "Done."
         }
     except Exception as e:
         logger.exception("Import failed")
         raise HTTPException(status_code=500, detail=str(e))
-
 @app.get("/healthz")
 def healthz():
     logger.debug("Health check requested")
