@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
         const toInsert = finalSkills.filter((s) => !have.has(s.trim().toLowerCase()));
         
         await Promise.all(
-          toInsert.map((name) => tx.userSkill.create({ data: { user_id: uid, skill_name: name } }))
+          toInsert.map((name) => tx.userSkill.create({ data: { user_id: uid, skill_name: name, last_updated: new Date()} }))
         );
       }
     });

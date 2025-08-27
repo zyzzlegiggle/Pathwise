@@ -63,6 +63,7 @@ model Job {
 model JobText {
   job_id      BigInt @id
   description String @db.MediumText
+  // embedding  VECTOR (SET RAW SQL)
 
   job Job @relation(fields: [job_id], references: [job_id], onDelete: Cascade)
 

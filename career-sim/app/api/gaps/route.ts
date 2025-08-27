@@ -6,8 +6,17 @@ export async function GET(req: NextRequest) {
   const userId = BigInt(url.searchParams.get("userId") || "1");
   const jobId  = BigInt(url.searchParams.get("jobId")  || "1");
   const topKSkills = Number(url.searchParams.get("k") || "40"); // skills to consider from JD
-  const coverageThreshold = Number(url.searchParams.get("t") || "0.25"); // min sim to count as “mentioned”
 
+  // 🔹 Synthetic placeholder response
+  return NextResponse.json({
+    cluster: { id: "123", name: "Software Engineering", sim: 0.87 },
+    missing: ["GraphQL", "Docker", "AWS"],
+
+    citations: [
+      { skillId: "1", name: "JavaScript", start: 120, end: 130, snippet: "... strong JavaScript skills required ..." },
+      { skillId: "3", name: "React", start: 300, end: 305, snippet: "... experience with React and modern frontend ..." },
+    ],
+  });
  
 
   // 0) load user skills and normalize to ontology nodes (by name/alias OR nearest neighbor)
@@ -16,6 +25,8 @@ export async function GET(req: NextRequest) {
     select: { skill_name: true },
   });
   const userSkillNames = userSkillsRaw.map((s) => s.skill_name.toLowerCase());
+
+  console.log(userSkillsRaw)
 
   // try exact/alias match first
   const matchedByName = await prisma.skillNode.findMany({
@@ -27,7 +38,10 @@ export async function GET(req: NextRequest) {
     },
     select: { id: true, name: true },
   });
+
   const userNodeIds = new Set<string>(matchedByName.map((s) => s.id.toString()));
+
+  console.log(userNodeIds)
 
   // fallback: embed-based nearest neighbors for unmapped names
   const unmapped = userSkillNames.filter(
@@ -56,7 +70,7 @@ export async function GET(req: NextRequest) {
      `SELECT embedding, description FROM job_texts WHERE job_id = ?`,
      jobId.toString()
    );
-   if (!jrow?.embedding) return NextResponse.json({ missing: [], cluster: null, coverage: [], citations: [] });
+   if (!jrow?.embedding) return NextResponse.json({ missing: [], cluster: null, citations: [] });
    const jobDescRaw: string = jrow.description || "";
    const jobDesc = jobDescRaw.toLowerCase();
   // 2) extract skills mentioned in JD via embedding similarity (top-K)
@@ -80,7 +94,7 @@ export async function GET(req: NextRequest) {
      LIMIT 1`,
     jrow.embedding
   );
-  if (!bestCluster) return NextResponse.json({ missing: [], cluster: null, coverage: [] });
+  if (!bestCluster) return NextResponse.json({ missing: [], cluster: null });
 
   // 4) load required skills for the chosen cluster
   const reqSkill = await prisma.$queryRawUnsafe<any[]>(

@@ -24,15 +24,6 @@ type JobRow = {
 export async function GET(req: NextRequest) {
   const uid = BigInt(new URL(req.url).searchParams.get("userId") || "1");
 
-  const [row] = await prisma.$queryRaw<{ embedding: unknown }[]>`
-    SELECT resume_embedding
-    FROM user_profile
-    WHERE user_id = ${uid}
-  `;
-  if (!row?.embedding) {
-    return NextResponse.json({ jobs: [] });
-  }
-
   const jobs = await prisma.$queryRaw<JobRow[]>`
     SELECT
       j.job_id,
@@ -40,13 +31,15 @@ export async function GET(req: NextRequest) {
       j.company,
       j.location,
       j.url,
-      (1 - VEC_COSINE_DISTANCE(jt.embedding, r.embedding) / 2.0) AS score
+      (1 - VEC_COSINE_DISTANCE(jt.embedding, r.resume_embedding) / 2.0) AS score
     FROM job_texts jt
     JOIN jobs j ON j.job_id = jt.job_id
     CROSS JOIN (SELECT resume_embedding FROM user_profile WHERE user_id = ${uid}) AS r
-    ORDER BY VEC_COSINE_DISTANCE(jt.embedding, r.embedding) ASC
+    ORDER BY VEC_COSINE_DISTANCE(jt.embedding, r.resume_embedding) ASC
     LIMIT 20
   `;
+
+ 
 
   // remove job_id (bigint) and add string id instead
   const payload = jobs.map(({ job_id, ...rest }) => ({

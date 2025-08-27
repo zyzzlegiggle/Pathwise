@@ -670,7 +670,7 @@ export default function HomePage() {
       setProgress("C", JSON.parse(e.data).progress)
     );
     es.addEventListener("payload", (e: any) => {
-      const { gaps, cluster, coverage, citations, pathExplorer } = JSON.parse(e.data);
+      const { gaps, cluster, citations, pathExplorer } = JSON.parse(e.data);
       setGapsByJob((prev) => ({ ...prev, [jid]: gaps || [] }));
       setClusterInfo(cluster || null); // optional: display "Matched cluster: Backend SWE (0.91)"
       if (citations?.length) {
@@ -1151,12 +1151,12 @@ const onRunF = () => {
                 {/* Paste Resume (unchanged component) */}
                 <div className="space-y-2">
                   <label className="block text-sm font-medium">Resume</label>
-                  {/* keep your Textarea + Upload button */}
                   <Textarea
                     value={resume}
                     onChange={(e: any) => setResume(e.target.value)}
                     placeholder="Write your resume here..."
                     className="h-40"
+
                   />
                   
                 </div>

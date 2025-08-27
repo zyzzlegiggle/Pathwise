@@ -146,7 +146,6 @@ export async function GET(req: NextRequest) {
         send("payload", { 
           gaps: j.missing || [],
           cluster: j.cluster || null,
-          coverage: j.coverage || [],
           citations: j.citations || [],
           pathExplorer,
         });
