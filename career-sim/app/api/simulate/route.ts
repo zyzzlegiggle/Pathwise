@@ -3,13 +3,14 @@ import { prisma } from "@/lib/db";
 
 export async function POST(req: NextRequest) {
   const { userId, jobId, weeklyHours = 10, weeks: weeksOverride, pathId } = await req.json();
-   const uid = BigInt(userId);
-  const jid = BigInt(jobId);
-
+   const uid = userId;
+  const jid = jobId;
+  console.log (uid)
+  console.log(jid);
   // get user & job vectors
-  const [u] = await prisma.$queryRawUnsafe<any[]>(`SELECT resume_embedding FROM user_profile WHERE user_id=?`, uid.toString());
-  const [j] = await prisma.$queryRawUnsafe<any[]>(`SELECT embedding FROM job_texts WHERE job_id=?`, jid.toString());
-  if (!u?.embedding || !j?.embedding) return NextResponse.json({ error: "Missing embeddings" }, { status: 400 });
+  const [u] = await prisma.$queryRawUnsafe<any[]>(`SELECT resume_embedding FROM user_profile WHERE user_id=?`, uid);
+  const [j] = await prisma.$queryRawUnsafe<any[]>(`SELECT embedding FROM job_texts WHERE job_id=?`, jid);
+  if (!u.resume_embedding || !j.embedding) return NextResponse.json({ error: "Missing embeddings" }, { status: 400 });
 
 
   // 1) find mentioned-but-missing skills (same logic as /api/gaps)
@@ -62,7 +63,7 @@ type GapItem = { skill: string; hours: number; remaining: number };
 const gaps: GapItem[] = [];
 for (const skill of targetMissing) {
   const [skillRow] = await prisma.$queryRawUnsafe<any[]>(
-    "SELECT embedding FROM skills_catalog WHERE skill_name = ?",
+    "SELECT embedding FROM skill_node WHERE name = ?",
     skill
   );
   if (!skillRow?.embedding) continue;

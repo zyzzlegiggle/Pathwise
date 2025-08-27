@@ -505,7 +505,9 @@ export default function HomePage() {
     try {
       const res = await fetch("/api/similar?userId=1");
       const data = await res.json();
+      console.log(data.jobs)
       setJobs(data.jobs || []);
+
       setMessage(`Found ${data.jobs?.length || 0} jobs`);
     } catch {
       setMessage("Error finding similar jobs");
@@ -518,7 +520,7 @@ export default function HomePage() {
     setLoading(true);
     setMessage("Analyzing skill gaps...");
     try {
-      const res = await fetch(`/api/gaps?userId=1&jobId=${jobId}`);
+      const res = await fetch(`/api/gaps?userId=1&jobId=${jobId}&mode=embedding`);
       const data = await res.json();
       setGapsByJob((prev) => ({ ...prev, [jobId]: data.missing ?? [] }));
       setMessage(`Found ${data.missing?.length ?? 0} gaps`);

@@ -39,12 +39,11 @@ export async function GET(req: NextRequest) {
     LIMIT 20
   `;
 
- 
 
   // remove job_id (bigint) and add string id instead
   const payload = jobs.map(({ job_id, ...rest }) => ({
     ...rest,
-    id: String(job_id), // use String to avoid overflow; use Number(...) if safe
+    id: String(job_id)
   }));
 
   return NextResponse.json(jsonSafe({ jobs: payload }));

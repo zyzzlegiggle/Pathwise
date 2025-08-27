@@ -1,192 +1,231 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
-export async function GET(req: NextRequest) {
-  const url = new URL(req.url);
-  const userId = BigInt(url.searchParams.get("userId") || "1");
-  const jobId  = BigInt(url.searchParams.get("jobId")  || "1");
-  const topKSkills = Number(url.searchParams.get("k") || "40"); // skills to consider from JD
-
-  // 🔹 Synthetic placeholder response
-  return NextResponse.json({
-    cluster: { id: "123", name: "Software Engineering", sim: 0.87 },
-    missing: ["GraphQL", "Docker", "AWS"],
-
-    citations: [
-      { skillId: "1", name: "JavaScript", start: 120, end: 130, snippet: "... strong JavaScript skills required ..." },
-      { skillId: "3", name: "React", start: 300, end: 305, snippet: "... experience with React and modern frontend ..." },
-    ],
-  });
- 
-
-  // 0) load user skills and normalize to ontology nodes (by name/alias OR nearest neighbor)
-  const userSkillsRaw = await prisma.userSkill.findMany({
-    where: { user_id: userId },
-    select: { skill_name: true },
-  });
-  const userSkillNames = userSkillsRaw.map((s) => s.skill_name.toLowerCase());
-
-  console.log(userSkillsRaw)
-
-  // try exact/alias match first
-  const matchedByName = await prisma.skillNode.findMany({
-    where: {
-      OR: [
-        { name: { in: userSkillNames, lte: "insensitive" } },
-        { aliases: { path: "$[*]", array_contains: userSkillNames as any } },
-      ],
-    },
-    select: { id: true, name: true },
-  });
-
-  const userNodeIds = new Set<string>(matchedByName.map((s) => s.id.toString()));
-
-  console.log(userNodeIds)
-
-  // fallback: embed-based nearest neighbors for unmapped names
-  const unmapped = userSkillNames.filter(
-    (n) => !matchedByName.some((m) => m.name.toLowerCase() === n)
-  );
-  if (unmapped.length) {
-    for (const n of unmapped) {
-      // SELECT top-1 node by cosine distance to the skill text
-      const [row] = await prisma.$queryRawUnsafe<any[]>(
-        `SELECT id, 1 - VEC_COSINE_DISTANCE(embedding, CAST(? AS VECTOR)) AS score
-         FROM skill_node
-         ORDER BY VEC_COSINE_DISTANCE(embedding, CAST(? AS VECTOR)) ASC
-         LIMIT 1`,
-        JSON.stringify([/* optional precomputed — see embedText(n) below */]),
-        JSON.stringify([/* same as above */])
-      );
-      // If you have embedText available server-side here, prefer:
-      // const vec = await embedText(n);
-      // const [row] = await prisma.$queryRawUnsafe<any[]>(`...`, JSON.stringify(vec), JSON.stringify(vec));
-      if (row?.id) userNodeIds.add(String(row.id));
-    }
-  }
-
-  // 1) fetch job embedding
-   const [jrow] = await prisma.$queryRawUnsafe<any[]>(
-     `SELECT embedding, description FROM job_texts WHERE job_id = ?`,
-     jobId.toString()
-   );
-   if (!jrow?.embedding) return NextResponse.json({ missing: [], cluster: null, citations: [] });
-   const jobDescRaw: string = jrow.description || "";
-   const jobDesc = jobDescRaw.toLowerCase();
-  // 2) extract skills mentioned in JD via embedding similarity (top-K)
-  const jdSkills = await prisma.$queryRawUnsafe<any[]>(
-    `SELECT id, name,
-            (1 - VEC_COSINE_DISTANCE(embedding, ?)) AS sim
-     FROM skill_node
-     ORDER BY sim DESC
-     LIMIT ?`,
-    jrow.embedding,
-    String(topKSkills)
-  );
-  const mentionedIds = new Set<string>(jdSkills.filter((r: any) => r.sim >= coverageThreshold).map((r: any) => String(r.id)));
-
-  // 3) pick the best role cluster by proximity of its centroid to the JD embedding
-  const [bestCluster] = await prisma.$queryRawUnsafe<any[]>(
-    `SELECT cluster_id, name,
-            (1 - VEC_COSINE_DISTANCE(centroid, ?)) AS sim
-     FROM role_cluster
-     ORDER BY sim DESC
-     LIMIT 1`,
-    jrow.embedding
-  );
-  if (!bestCluster) return NextResponse.json({ missing: [], cluster: null });
-
-  // 4) load required skills for the chosen cluster
-  const reqSkill = await prisma.$queryRawUnsafe<any[]>(
-    `SELECT rcs.skill_id, sn.name, rcs.weight
-     FROM role_cluster_skill rcs
-     JOIN skill_node sn ON sn.id = rcs.skill_id
-     WHERE rcs.cluster_id = ?`,
-    bestCluster.cluster_id.toString()
-  );
-
-  // 5) compute coverage and gaps
-  //    - coverage: required skills that are also “mentioned” in JD (evidence they matter for this posting)
-  //    - userHas: user skills (normalized) that match required skills or their ancestors
-  // ancestor closure (1 level up for now)
-  const ancestors = new Map<string, string | null>();
-  const getParentId = async (sid: string) => {
-    if (ancestors.has(sid)) return ancestors.get(sid);
-    const r = await prisma.skillNode.findUnique({
-      where: { id: BigInt(sid) },
-      select: { parent_id: true },
-    });
-    const v = r?.parent_id ? String(r.parent_id) : null;
-    ancestors.set(sid, v);
-    return v;
-  };
-
-  const coverage: { skillId: string; name: string; required: number; mentioned: boolean; userHas: boolean }[] = [];
-  const missing: string[] = [];
-  const citations: { skillId: string; name: string; start: number; end: number; snippet: string }[] = [];
-
-  for (const s of reqSkill) {
-    const sid = String(s.skill_id);
-    const mentioned = mentionedIds.has(sid);
-    // userHas if exact skill id OR parent matches
-    let userHas = userNodeIds.has(sid);
-    if (!userHas) {
-      const p = await getParentId(sid);
-      if (p && userNodeIds.has(p)) userHas = true;
-    }
-     if (mentioned) {
-   const span = await findSpanForSkill(BigInt(sid), s.name);
-   if (span) {
-     // persist
-     await prisma.jobSkillEvidence.upsert({
-       where: { job_id_skill_id_start_end: { job_id: jobId, skill_id: BigInt(sid), start: span.start, end: span.end } as any },
-       create: { job_id: jobId, skill_id: BigInt(sid), start: span.start, end: span.end, snippet: span.snippet },
-       update: { snippet: span.snippet },
-     });
-     citations.push({ skillId: sid, name: s.name, start: span.start, end: span.end, snippet: span.snippet });
-   }
- }
-    coverage.push({ skillId: sid, name: s.name, required: s.weight, mentioned, userHas });
-    if (!userHas && mentioned) missing.push(s.name);
-  }
-
-  // sort missing by cluster weight (descending)
-  coverage.sort((a, b) => b.required - a.required);
-
-  return NextResponse.json({
-    cluster: { id: String(bestCluster.cluster_id), name: bestCluster.name, sim: Number(bestCluster.sim?.toFixed(3) || 0) },
-    missing,
-    coverage, // useful for UI: show required/mentioned/userHas flags
-    citations,
-  });
-
-   // helper to locate best substring span for a skill (name + aliases)
- async function findSpanForSkill(skillId: bigint, fallbackName: string) {
-   // fetch aliases quickly
-   const node = await prisma.skillNode.findUnique({
-     where: { id: skillId },
-     select: { name: true, aliases: true },
-   });
-   const cands = [node?.name || fallbackName, ...((node?.aliases as string[]) || [])]
-     .filter(Boolean)
-     .map((s) => String(s).toLowerCase());
-   let best: { start: number; end: number } | null = null;
-   for (const term of cands) {
-     const idx = jobDesc.indexOf(term);
-     if (idx >= 0) {
-       const start = idx;
-       const end = idx + term.length;
-       if (!best || (end - start) > (best.end - best.start)) best = { start, end };
-     }
-   }
-   if (!best) return null;
-   // build windowed snippet (~80 chars around)
-   const pad = 80;
-   const s = Math.max(0, best.start - pad);
-   const e = Math.min(jobDescRaw.length, best.end + pad);
-   const snippet = jobDescRaw.slice(s, e).replace(/\s+/g, " ").trim();
-   return { ...best, snippet };
- }
+/** Utility: normalize a skill name for comparisons */
+function norm(s: string) {
+  return s.trim().toLowerCase();
 }
 
+/** Utility: build a safe regex from a literal string */
+function escapeRegex(lit: string) {
+  return lit.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
+/** Utility: pick a nice snippet window around a match */
+function snippet(text: string, start: number, end: number, radius = 60) {
+  const s = Math.max(0, start - radius);
+  const e = Math.min(text.length, end + radius);
+  const raw = text.slice(s, e);
+  return (s > 0 ? "…" : "") + raw + (e < text.length ? "…" : "");
+}
+
+/** Dedupe by key while keeping first occurrence */
+function uniqueBy<T>(arr: T[], key: (t: T) => string | number) {
+  const seen = new Set<string | number>();
+  const out: T[] = [];
+  for (const item of arr) {
+    const k = key(item);
+    if (!seen.has(k)) {
+      seen.add(k);
+      out.push(item);
+    }
+  }
+  return out;
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const url = new URL(req.url);
+    const userId = BigInt(url.searchParams.get("userId") || "1");
+    const jobId  = BigInt(url.searchParams.get("jobId")  || "1");
+    const mode   = url.searchParams.get("mode") || "keyword"; // "keyword" | "embedding" (optional)
+
+    // 1) Load user's declared skills
+    const userSkillRows = await prisma.userSkill.findMany({
+      where: { user_id: userId },
+      select: { skill_name: true },
+    });
+    const userSkillsNorm = new Set(userSkillRows.map(s => norm(s.skill_name)));
+
+    // 2) Load job description
+    const job = await prisma.jobText.findUnique({
+      where: { job_id: jobId },
+      select: { description: true },
+    });
+    if (!job?.description) {
+      return NextResponse.json(
+        { error: `No job description found for job_id=${jobId.toString()}` },
+        { status: 404 }
+      );
+    }
+    const text = job.description;
+
+    // 3) Load skill taxonomy (names + aliases + parent)
+    const allSkills = await prisma.skillNode.findMany({
+      select: { id: true, name: true, aliases: true, parent_id: true },
+    });
+
+    // Build a list of (skillId, label) strings to match (name + aliases[])
+    type SkillLabel = { id: bigint; name: string; label: string; parent_id: bigint | null };
+    const labels: SkillLabel[] = [];
+    for (const s of allSkills) {
+      labels.push({ id: s.id, name: s.name, label: s.name, parent_id: s.parent_id ?? null });
+      if (Array.isArray(s.aliases)) {
+        for (const alias of s.aliases as string[]) {
+          if (alias && typeof alias === "string") {
+            labels.push({ id: s.id, name: s.name, label: alias, parent_id: s.parent_id ?? null });
+          }
+        }
+      } else if (s.aliases && typeof s.aliases === "object") {
+        // Some people store aliases as object {alts: [...]} – try to read plain arrays too
+        const maybeArr = (s.aliases as any).alts;
+        if (Array.isArray(maybeArr)) {
+          for (const alias of maybeArr) {
+            if (alias && typeof alias === "string") {
+              labels.push({ id: s.id, name: s.name, label: alias, parent_id: s.parent_id ?? null });
+            }
+          }
+        }
+      }
+    }
+
+    // Optional: a quick map from skillId -> parent_id
+    const parentById = new Map<string, bigint | null>();
+    for (const s of allSkills) parentById.set(s.id.toString(), s.parent_id ?? null);
+
+    // 4) Find mentions of skills in the job description (case-insensitive, word boundaries)
+    type Mention = {
+      skillId: string; // keep as string for JSON friendliness
+      name: string;    // canonical skill name (from SkillNode.name)
+      start: number;
+      end: number;
+      snippet: string;
+      parent_id: bigint | null;
+    };
+    const mentions: Mention[] = [];
+
+    // Tokenize-once approach using regex per label (simple & clear)
+    for (const L of labels) {
+      // \b is OK for most ASCII skills; for symbols like "C++", fall back to plain match.
+      // We'll try word boundaries unless label contains non-word chars.
+      const hasNonWord = /[^A-Za-z0-9_]/.test(L.label);
+      const body = hasNonWord
+        ? new RegExp(escapeRegex(L.label), "gi")
+        : new RegExp(`\\b${escapeRegex(L.label)}\\b`, "gi");
+
+      let m: RegExpExecArray | null;
+      while ((m = body.exec(text)) !== null) {
+        const start = m.index;
+        const end = start + m[0].length;
+        mentions.push({
+          skillId: L.id.toString(),
+          name: L.name,
+          start,
+          end,
+          snippet: snippet(text, start, end),
+          parent_id: L.parent_id ?? null,
+        });
+      }
+    }
+
+    // Dedupe mentions by skillId (keep first occurrence for clean citations)
+    const dedupedMentions = uniqueBy(mentions, (m) => m.skillId);
+
+    // 5) Compute "missing" = skills in job description but NOT in user's set
+    const missing = dedupedMentions
+      .filter(m => !userSkillsNorm.has(norm(m.name)))
+      .map(m => m.name);
+
+    // 6) Basic similarity heuristic (coverage of mentioned skills the user already has)
+    const totalMentionedUnique = dedupedMentions.length || 1;
+    const userHasCount = dedupedMentions.filter(m => userSkillsNorm.has(norm(m.name))).length;
+    const sim = Number((userHasCount / totalMentionedUnique).toFixed(2));
+
+    // 7) Pick a simple "cluster" by most-common parent among mentioned skills (if available)
+    let cluster = { id: "", name: "General", sim };
+    if (dedupedMentions.length > 0) {
+      const counts = new Map<string, number>();
+      for (const m of dedupedMentions) {
+        const key = (m.parent_id ?? -1n).toString();
+        counts.set(key, (counts.get(key) || 0) + 1);
+      }
+      const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+      if (top) {
+        const parentId = BigInt(top[0]);
+        if (parentId !== -1n) {
+          // fetch parent node name (one query)
+          const parent = await prisma.skillNode.findUnique({
+            where: { id: parentId },
+            select: { id: true, name: true },
+          });
+          if (parent) cluster = { id: parent.id.toString(), name: parent.name, sim };
+        }
+      }
+    }
+
+    // 8) Prepare citations (for missing ones first, then others if you want all)
+    const missingSet = new Set(missing.map(norm));
+    const citations = [
+      // missing-first citations
+      ...dedupedMentions
+        .filter(m => missingSet.has(norm(m.name))),
+      // then the rest (not strictly necessary; comment out if you only want missing citations)
+      // ...dedupedMentions.filter(m => !missingSet.has(norm(m.name))),
+    ].map(m => ({
+      skillId: m.skillId,
+      name: m.name,
+      start: m.start,
+      end: m.end,
+      snippet: m.snippet,
+    }));
+
+    // 9) (Optional) Embedding-mode example via raw SQL (TiDB). Keep it simple.
+    // If you want to enrich "missing" with top-k similar skills to the job embedding,
+    // uncomment and call with ?mode=embedding
+    //
+    // NOTE: This assumes you have an `embedding` VECTOR column on both tables,
+    // and TiDB supports <=> as a distance operator. Adjust names as needed.
+    //
+    if (mode === "embedding") {
+      try {
+        const similar = await prisma.$queryRawUnsafe<
+          Array<{ id: bigint; name: string; sim: number }>
+        >(
+          `
+          SELECT sn.id, sn.name,
+                 1 - (sn.embedding <=> (SELECT jt.embedding FROM job_texts jt WHERE jt.job_id = ?)) AS sim
+          FROM skill_node sn
+          ORDER BY sim DESC
+          LIMIT 50
+          `,
+          jobId.toString()
+        );
+
+        // add the top-N similar skills that are not in user's skills and not already in missing
+        const already = new Set(missing.map(norm));
+        const extra = similar
+          .map(r => r.name)
+          .filter(n => !userSkillsNorm.has(norm(n)) && !already.has(norm(n)));
+
+        // tack on a few (limit to 5 to keep it tidy)
+        for (const x of extra.slice(0, 5)) missing.push(x);
+      } catch (e) {
+        // swallow embedding errors silently so keyword flow still works
+        // console.error("Embedding mode error:", e);
+      }
+    }
+
+    // 10) Return
+    return NextResponse.json({
+      cluster,
+      missing: [...uniqueBy(missing, s => norm(s))].slice(0, 25), // cap list
+      citations, // first occurrence per skill for clean UX
+    });
+  } catch (err) {
+    // console.error(err);
+    return NextResponse.json(
+      { error: "Unexpected error resolving skill gaps." },
+      { status: 500 }
+    );
+  }
+}

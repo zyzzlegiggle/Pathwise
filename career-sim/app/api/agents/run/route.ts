@@ -106,7 +106,7 @@ export async function GET(req: NextRequest) {
           step(15);
           send("log", { line: `Goals: ${timeframeMin}-${timeframeMax} mo;` });
         // this will return missing skills?
-        const r = await fetch(`${origin}/api/gaps?userId=${userId}&jobId=${jobId}`); 
+        const r = await fetch(`${origin}/api/gaps?userId=${userId}&jobId=${jobId}&mode=embedding`); 
         const j = await r.json();
         const targetRoleName = searchParams.get("targetRole") || "Backend SWE";
 
