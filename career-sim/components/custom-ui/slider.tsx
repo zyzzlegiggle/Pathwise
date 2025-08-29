@@ -1,9 +1,5 @@
 'use client'
 
-
-
-
-
 export const Slider = ({ label, min, max, step = 1, value, onChange, suffix }: any) => (
   <div>
     <div className="mb-1 flex items-center justify-between text-sm">

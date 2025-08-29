@@ -14,12 +14,7 @@ model User {
   country          String?
   created_at       DateTime @default(now())
   skills           UserSkill[]
-  simulations      Simulation[]
-  goal             UserGoal?
-  learningPaths    LearningPath[]
   userProfile      UserProfile?
-
-  
 
   @@map("users")
 }
@@ -51,8 +46,6 @@ model Job {
   post_date   DateTime? @db.Date
   url         String? @db.Text
   text        JobText?
-  requirements JobRequirement[]
-  sim_targets  SimTarget[]
 
   @@unique([source, external_id])
   @@index([post_date])
@@ -70,19 +63,6 @@ model JobText {
   @@map("job_texts")
 }
 
-model JobRequirement {
-  job_id     BigInt
-  skill_name String
-  importance Int?
-
-  job Job @relation(fields: [job_id], references: [job_id], onDelete: Cascade)
-
-  @@id([job_id, skill_name])
-  @@index([skill_name])
-  @@map("job_requirements")
-}
-
-
 model Resource {
   resource_id    BigInt   @id @default(autoincrement())
   title          String?
@@ -97,85 +77,6 @@ model Resource {
   @@map("resources")
 }
 
-model Simulation {
-  sim_id         BigInt   @id @default(autoincrement())
-  user_id        BigInt
-  path_name      String?
-  duration_weeks Int?
-  created_at     DateTime @default(now())
-
-  user  User              @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
-  steps SimulationStep[]
-  targets SimTarget[]
-
-  @@index([user_id])
-  @@map("simulations")
-}
-
-model SimulationStep {
-  sim_id                  BigInt
-  week                    Int
-  added_skills            Json?
-  est_qualification_score Decimal? @db.Decimal(5,2)
-
-  simulation Simulation @relation(fields: [sim_id], references: [sim_id], onDelete: Cascade)
-
-  @@id([sim_id, week])
-  @@map("simulation_steps")
-}
-
-model SimTarget {
-  sim_id     BigInt
-  job_id     BigInt
-  fit_score  Decimal? @db.Decimal(5,2)
-  gap_skills Json?
-  rationale  String? @db.MediumText
-
-  simulation Simulation @relation(fields: [sim_id], references: [sim_id], onDelete: Cascade)
-  job        Job        @relation(fields: [job_id], references: [job_id], onDelete: Cascade)
-
-  @@id([sim_id, job_id])
-  @@index([fit_score])
-  @@map("sim_targets")
-}
-
-model UserGoal {
-  user_id              BigInt   @id
-  target_role          String
-  timeframe_min_months Int
-  timeframe_max_months Int
-  created_at           DateTime @default(now())
-  updated_at           DateTime @updatedAt
-
-  // 1–1 relation to User via user_id
-  user User @relation(fields: [user_id], references: [user_id])
-
-  @@map("user_goal")
-}
-
-
-model LearningPath {
-  path_id    BigInt   @id @default(autoincrement())
-  user_id    BigInt
-  job_id     BigInt
-  name       String
-  skills     Json      // ["Rust","Tokio","Async Rust", ...]
-  created_at DateTime  @default(now())
-
-  user User @relation(fields: [user_id], references: [user_id])
-
-  @@map("learning_path")
-}
-
-model LearningPathRun { // optional: store chosen paths per run
-  run_id     BigInt   @id @default(autoincrement())
-  path_id    BigInt
-  weekly_hours Int
-  created_at DateTime @default(now())
-
-  @@map("learning_path_run")
-}
-
 model SkillNode {
   id         BigInt   @id @default(autoincrement())
   name       String
@@ -184,51 +85,9 @@ model SkillNode {
   // VECTOR embedding  in TiDB;, set via raw SQL
   @@index([parent_id])
 
-
-   roleClusters RoleClusterSkill[]
-
   @@map("skill_node")
 }
 
-model RoleCluster {
-  cluster_id BigInt  @id @default(autoincrement())
-  name       String  @unique
-   // VECTOR centroid (JD embedding mean)
-   skills     RoleClusterSkill[]
-  @@map("role_cluster")
-}
-
-model RoleClusterSkill {
-  id         BigInt   @id @default(autoincrement())
-  cluster_id BigInt
-  skill_id   BigInt
-  weight     Float    @default(1.0)
-
-  cluster    RoleCluster @relation(fields: [cluster_id], references: [cluster_id])
-  skill      SkillNode   @relation(fields: [skill_id], references: [id])
-
-  @@unique([cluster_id, skill_id])
-  @@map("role_cluster_skill")
-}
-
-model SalaryBenchmark {
-  id        BigInt  @id @default(autoincrement())
-  role      String
-  level     String?
-  country   String?
-  region    String?
-  city      String?
-  currency  String   @default("USD")
-  p25       Int?
-  median    Int?
-  p75       Int?
-  source    String?  // "levels.fyi 2025-06 dump", etc.
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([role, level, country, region, city])
-  @@map("salary_benchmarks")
-}
 
 model UserProfile {
   user_id          BigInt   @id
@@ -242,15 +101,3 @@ model UserProfile {
   @@map("user_profile")
 }
 
-
-
-model CalibrationModel {
-  id         BigInt   @id @default(autoincrement())
-  name       String   @unique       // e.g., "default"
-  // Simple logistic: p = σ(b0 + b1 * s_norm)
-  b0         Float
-  b1         Float
-  updated_at DateTime @updatedAt
-
-  @@map("CalibrationModel")
-}

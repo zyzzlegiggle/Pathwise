@@ -7,7 +7,7 @@ export async function extractProfileFromText(text: string): Promise<UserProfile>
   try{
   const userId = '1';
 
-  const res = await fetch("/api/llm/extract-profile", {
+  const res = await fetch("/api/extract-profile", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, userId }),
