@@ -1,27 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { embedText, structuredConfig, structuredOutput } from "@/lib/llm";
-import { GoogleGenAI, Type } from "@google/genai";
-import { log } from "console";
-
-const ai = new GoogleGenAI({});
+import { Type } from "@google/genai";
 
 
-function normSkill(s: string) {
-  return s.trim().toLowerCase();
-}
-function uniq<T>(arr: T[]) {
-  return Array.from(new Set(arr));
-}
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const userId = String(body.userId ?? "1");
     const resumeText: string = String(body.resumeText ?? "");
-    const shortForm = body.shortForm ?? {};
-    const yearsExperience = shortForm.yearsExperience ?? null;
-    const education: string = String(shortForm.education ?? "");
+    const yearsExperience = body.yearsExperience ?? null;
+    const education: string = String(body.education ?? "");
+    const skills: string[] = body.skills ?? [];
 
     if (!resumeText || resumeText.trim().length < 20) {
       return NextResponse.json({ ok: false, error: "Resume must be provided or too short" }, { status: 400 });
@@ -35,27 +26,8 @@ export async function POST(req: NextRequest) {
 
     const uid = BigInt(userId);
 
-    // LLM skill extraction
-    const config: structuredConfig = {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: { skills: { type: Type.ARRAY, items: { type: Type.STRING } } },
-        required: ["skills"],
-        propertyOrdering: ["skills"],
-      },
-    };
-    const llmPrompt = `Extract a concise, de-duplicated list of skills (technologies, languages, frameworks, tools) from this resume:\n\n${resumeText}`;
-    let llmSkills: string[] = [];
-    try {
-      const out = await structuredOutput(llmPrompt, config);
-      llmSkills = Array.isArray(out?.skills) ? out.skills : [];
-    } catch {
-      llmSkills = [];
-    }
-
     const candidateText = [
-      llmSkills.join(", "),
+      skills.join(", "),
       education,
       resumeText.slice(0, 20000),
     ].join("\n").toLowerCase();
@@ -75,7 +47,7 @@ export async function POST(req: NextRequest) {
         .map((x) => String(x).toLowerCase());
       if (names.some(hasWord)) extracted.add(s.name);
     }
-    for (const s of llmSkills) extracted.add(s);
+    for (const s of skills) extracted.add(s);
 
     const finalSkills = Array.from(extracted).slice(0, 200);
 

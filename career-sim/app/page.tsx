@@ -1,1625 +1,442 @@
-// app/page.tsx
-"use client";
-
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+'use client'
+import React, { useMemo, useState } from "react";
 import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  CardFooter
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Progress } from "@/components/ui/progress";
-import {
+  ArrowRight,
+  BarChart3,
+  Brain,
+  Calendar,
+  CircleDollarSign,
+  Clock,
+  GitBranch,
+  Info,
+  Layers,
   LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
+  ListChecks,
+  Map,
+  RefreshCw,
+  Shield,
+  Sparkles,
+  Users
+} from "lucide-react";
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
   CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis
 } from "recharts";
-
-import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Tooltip as TooltipShadcn,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
-
-import { Slider } from "@/components/ui/slider";
-import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import {
-  Dialog,
-  DialogTrigger,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { BadgeCheck, Play, FileDown, Loader2 } from "lucide-react";
-import { ReferenceLine, Legend } from "recharts";
-import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, ChevronRight } from "lucide-react";
-
-import{
-  ReactFlow, 
+import ReactFlow, {
   Background,
   Controls,
   MiniMap,
-  useNodesState,
-  useEdgesState,
-  MarkerType,
-} from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
-import { Checkbox } from "@/components/ui/checkbox";
+  Position
+} from "reactflow";
+import "reactflow/dist/style.css";
+import { Metric } from "@/components/custom-ui/metric";
+import { Chip } from "@/components/custom-ui/chip";
+import { Slider } from "@/components/custom-ui/slider";
+import { Section } from "@/components/custom-ui/section";
+import { Toggle } from "@/components/custom-ui/toggle";
+import { UserProfile } from "../types/user-profile";
+import { OnboardingForm } from "@/components/custom-ui/on-boarding-form";
+import { SidebarProfile } from "@/components/custom-ui/sidebar-profile";
 
 
-type JobResult = {
-  id: string; // backend returns string; was number before (fix)
-  title: string;
-  company: string;
-  location: string;
-  url: string;
-  score: number;
-};
-type ResourceHit = {
-  title: string;
-  provider: string;
-  url: string;
-  hours_estimate?: number;
-  score?: number;
-};
-type SimStep = { week: number; score: number;  prob?: number };
-
-// ---------- Agent Orchestrator Types ----------
-type AgentKey = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H";
-type AgentStatus = "idle" | "running" | "done" | "error";
-type AgentInfo = {
-  key: AgentKey;
-  title: string;
-  subtitle: string;
-};
-const AGENTS: AgentInfo[] = [
-  {
-    key: "A",
-    title: "Profile Ingestor",
-    subtitle: "Parse resume → extract skills → embed → store",
-  },
-  {
-    key: "B",
-    title: "Market Crawler",
-    subtitle: "Fetch jobs from JSearch → embed/store",
-  },
-  {
-    key: "C",
-    title: "Skill Mapper",
-    subtitle: "Map job requirements to skills → compute gaps",
-  },
-  {
-    key: "D",
-    title: "Curriculum Assembler",
-    subtitle: "Find learning resources per gap",
-  },
-  { key: "E", title: "Simulator", subtitle: "12-week qualification simulation" },
-  {
-    key: "F",
-    title: "Explainer",
-    subtitle: "Why this path? trade-offs + citations",
-  },
-  {
-    key: "G",
-    title: "Counterfactual Comparator",
-    subtitle: "Simulate choices side-by-side (bootcamp vs. self-study vs. transfer)",
-  }, 
-  { key: "H", title: "Similar Profiles", subtitle: "People like me — receipts & outcomes" },
-
-];
-
-type AgentState = Record<
-  AgentKey,
-  {
-    status: AgentStatus;
-    log: string[];
-    progress: number; // 0–100
-  }
->;
-
-function newAgentState(): AgentState {
-  return {
-    A: { status: "idle", log: [], progress: 0 },
-    B: { status: "idle", log: [], progress: 0 },
-    C: { status: "idle", log: [], progress: 0 },
-    D: { status: "idle", log: [], progress: 0 },
-    E: { status: "idle", log: [], progress: 0 },
-    F: { status: "idle", log: [], progress: 0 },
-    G: { status: "idle", log: [], progress: 0 },
-    H: { status: "idle", log: [], progress: 0 },
-  };
+// --- Mock helpers ---
+function clamp(n: number, a: number, b: number) {
+  return Math.max(a, Math.min(b, n));
 }
 
-type Series = { label: string; steps: SimStep[] };
+function gaussian(mu: number, sigma: number, x: number) {
+  const coef = 1 / (sigma * Math.sqrt(2 * Math.PI));
+  return coef * Math.exp(-0.5 * Math.pow((x - mu) / sigma, 2));
+}
 
-// Counterfactual decisions the user can compare
-type DecisionOption = { id: string; label: string; description?: string };
-
-// Uncertainty band for outcomes (p25/p50/p75 per week)
-type OutcomeBand = { week: number; p25: number; p50: number; p75: number };
-
-type ConfidenceBand = { p25: number; p50: number; p75: number };
-type BridgeTransition = {
-  fromSkill: string;
-  bridgeSkill: string;
-  toRole: string;
-  confidence: ConfidenceBand;
-  exampleProfileIds: string[];
-};
-type ExampleProfile = {
-  id: string;
-  title: string;
-  summary: string;
-  outcome?: { timeToOfferWeeks?: number; comp1yr?: number };
-};
-
-type RFNode = {
-  id: string;
-  position: { x: number; y: number };
-  data: { label: string; kind: "from" | "bridge" | "role" };
-};
-type RFEdge = {
-  id: string;
-  source: string;
-  target: string;
-  label?: string;
-  markerEnd?: any;
-  data?: { p25: number; p50: number; p75: number; exampleProfileIds: string[] };
-};
-
-// Summary metrics per decision to show “why” + trade-offs
-export type DecisionSummary = {
-  decisionId: string;
-  cohortSize?: number;
-  timeToOfferP50?: number;       // weeks
-  salaryDeltaMedian?: number;    // vs baseline
-  comp1yr?: number;              
-  comp3yrCeiling?: number;       
-  burnoutRisk?: number;          
-  currency?: string;             
-  explanation?: string;   
-  riskNotes?: string;            // short text (“small cohort”, etc.)
-};
-
-
-
-type PlanTask = {
-  id: string;
-  title: string;
-  estHours: number;
-  priority: "high" | "med" | "low";
-  skill?: string;
-  url?: string;
-  done?: boolean;
-};
-
-type WeeklyPlanWeek = {
-  week: number;
-  plannedHours: number;
-  checkpoint?: {
-    title: string;
-    criteria: string; // short description of what "done" looks like
-  };
-  carriesOverFrom?: number; // previous week number if rolled forward
-  tasks: PlanTask[];
-};
-
-type SimilarReceipt = {
-  profileId: string;
-  similarity: number; // 0–1
-  pathTaken: string[]; // chips
-  timeToOffer?: number; // weeks
-  compAfter1yr?: number;
-  snippet: string;
-  sources: { label: string; url?: string }[];
-};
-
-export default function HomePage() {
-  const [resume, setResume] = useState("");
-  const [role, setRole] = useState("software engineer");
-  const [location, setLocation] = useState("United States");
-  const [remoteOnly, setRemoteOnly] = useState(false);
-
-  const [loading, setLoading] = useState(false);
-  const [jobs, setJobs] = useState<JobResult[]>([]);
-  const [message, setMessage] = useState("");
-  const [gapsByJob, setGapsByJob] = useState<Record<string, string[]>>({});
-  const [resourcesBySkill, setResourcesBySkill] = useState<
-    Record<string, ResourceHit[]>
-  >({});
-  const [simSteps, setSimSteps] = useState<SimStep[]>([]);
-  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
-  const [explanation, setExplanation] = useState<string>("");
-  const [citedJobIds, setCitedJobIds] = useState<string[]>([]);
-  const [multiSeries, setMultiSeries] = useState<Series[]>([]);
-  const [goalRole, setGoalRole] = useState("backend SWE");
-  const [goalMonths, setGoalMonths] = useState<[number, number]>([6, 9]);
-  const [paths, setPaths] = useState<{ pathId: string; name: string; skills: string[] }[]>([]);
-  const [selectedPathIds, setSelectedPathIds] = useState<string[]>([]);
-  const [clusterInfo, setClusterInfo] = useState<{id:string,name:string,sim:number}|null>(null);
-  const [salaryTarget, setSalaryTarget] = useState<any>(null);
-  const [salaryBaseline, setSalaryBaseline] = useState<any>(null);
-  const [salaryDelta, setSalaryDelta] = useState<{currency:string; medianDelta:number|null}|null>(null);
-  const [citationsByJob, setCitationsByJob] = useState<Record<string, Array<{skillId:string; name:string; start:number; end:number; snippet:string}>>>({});
-  const [yearsExp, setYearsExp] = useState<number | ''>('');
-  const [educationText, setEducationText] = useState("");
-  const [savedPaths, setSavedPaths] = useState<any[]>([]);
-  const [savedSeries, setSavedSeries] = useState<any[]>([]);
-  const [weeklyHours, setWeeklyHours] = useState<number>(10);
-  const [activeSeries, setActiveSeries] = useState<string[]>([]);   // which series are visible
-  const [targetThreshold, setTargetThreshold] = useState<number>(75); // goal line on chart
-  const [jobsPage, setJobsPage] = useState(1);
-  const [riskTolerance, setRiskTolerance] = useState<1 | 2 | 3>(2); // 1=safe,2=balanced,3=aggressive
-  const [decisions, setDecisions] = useState<DecisionOption[]>([
-    { id: "self-study", label: "Self-study (10h/wk)", description: "Projects + open source" },
-    { id: "bootcamp", label: "Part-time bootcamp", description: "Tuition + structured mentorship" },
-    { id: "internal-transfer", label: "Internal transfer", description: "Move to a new role in current company" },
-  ]);
-
-  const [bridgeSkills, setBridgeSkills] = useState<string[]>([]);
-  const [transitions, setTransitions] = useState<BridgeTransition[]>([]);
-  const [exampleProfiles, setExampleProfiles] = useState<Record<string, ExampleProfile>>({});
-  const [activeBridge, setActiveBridge] = useState<string | null>(null);
-  const [showProfileId, setShowProfileId] = useState<string | null>(null);
-
-  const [weeklyPlan, setWeeklyPlan] = useState<WeeklyPlanWeek[]>([]);
-  const [currentWeek, setCurrentWeek] = useState<number>(1);
-
-  const [rfNodes, setRfNodes, onNodesChange] = useNodesState<RFNode>([]);
-  const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState<RFEdge>([]);
-  
-  // Which choices to compare
-  const [selectedDecisionIds, setSelectedDecisionIds] = useState<string[]>(["self-study", "bootcamp"]);
-
-  // Result: for each decision, an array of p25/p50/p75 bands per week
-  const [compareSeries, setCompareSeries] = useState<Record<string, OutcomeBand[]>>({});
-
-  // Result: quick facts for cards
-  const [decisionSummaries, setDecisionSummaries] = useState<DecisionSummary[]>([]);
-  const pageSize = 6;
-  const pagedJobs = useMemo(() => {
-    const start = (jobsPage - 1) * pageSize;
-    return jobs.slice(start, start + pageSize);
-  }, [jobs, jobsPage]);
-  const totalJobPages = Math.max(1, Math.ceil(jobs.length / pageSize));
-  useEffect(() => { if (jobs.length) setJobsPage(1); }, [jobs]);
-  // collapse/expand for job rows
-  const [openJobIds, setOpenJobIds] = useState<Record<string, boolean>>({});
-  const [similarReceipts, setSimilarReceipts] = useState<SimilarReceipt[]>([]);
-  const toggleJobRow = (id: string) =>
-    setOpenJobIds(prev => ({ ...prev, [id]: !prev[id] }));
-
-  // tiny fade/slide variants for smoother tab/content transitions
-  const fadeSlide = {
-    initial: { opacity: 0, y: 8 },
-    animate: { opacity: 1, y: 0, transition: { duration: 0.18 } },
-    exit: { opacity: 0, y: 8, transition: { duration: 0.12 } },
-  };
-
-  const RiskBadge: React.FC<{ score?: number }> = ({ score }) => {
-  if (score == null) return <Badge variant="outline">N/A</Badge>;
-  const label = score < 30 ? "Low" : score < 60 ? "Med" : "High";
-  return <Badge variant={score < 30 ? "secondary" : score < 60 ? "default" : "destructive"}>
-    Burnout: {label}
-  </Badge>;
-  };
-
-  useEffect(() => {
-  if (multiSeries.length) {
-    setActiveSeries(multiSeries.map((s) => s.label));
-  } else {
-    setActiveSeries(["Match score", "Qualification probability"]);
+// Create a simple distribution for time-to-first-offer (in weeks)
+function makeTTFO(mean: number, sd: number) {
+  const data = [] as { week: number; Safe: number; Aggressive: number }[];
+  for (let w = 2; w <= 40; w++) {
+    data.push({ week: w, Safe: gaussian(mean + 2, sd, w), Aggressive: gaussian(mean - 3, sd * 0.8, w) });
   }
-  }, [multiSeries]);
+  return data;
+}
 
-  useEffect(() => {
-    if (!transitions.length) {
-      setRfNodes([]);
-      setRfEdges([]);
-      return;
-    }
-    const filtered = transitions.filter(
-      (t) => !activeBridge || t.bridgeSkill === activeBridge
-    );
+// Feature importance mock
+function makeImportances() {
+  return [
+    { factor: "Portfolio / work samples", lift: 0.22 },
+    { factor: "Relevant certification", lift: 0.11 },
+    { factor: "Interview practice", lift: 0.2 },
+    { factor: "Networking (warm intros)", lift: 0.18 },
+    { factor: "Mentorship / coaching", lift: 0.12 },
+    { factor: "Public profile (talks, writing)", lift: 0.09 },
+    { factor: "Volunteering / internships", lift: 0.08 },
+  ];
+}
 
-    // columns & spacing
-    const colX = { from: 40, bridge: 300, role: 580 };
-    const rowH = 84;
+// --- Path Explorer Graph (React Flow) ---
+const nodeBase = "rounded-xl border bg-white px-3 py-2 text-sm shadow-sm dark:border-gray-800 dark:bg-gray-900";
 
-    // unique nodes
-    const froms = Array.from(new Set(filtered.map((t) => t.fromSkill)));
-    const bridges = Array.from(new Set(filtered.map((t) => t.bridgeSkill)));
-    const roles = Array.from(new Set(filtered.map((t) => t.toRole)));
+function PathExplorer({ planMode }: { planMode: string }) {
+  const nodes = useMemo(() => ([
+    { id: "you", position: { x: 0, y: 120 }, data: { label: "You now" }, type: "input", style: { width: 150 }, className: nodeBase },
+    { id: "bridge1", position: { x: 240, y: 40 }, data: { label: "Bridge: foundational skills" }, className: nodeBase },
+    { id: "bridge2", position: { x: 240, y: 200 }, data: { label: "Bridge: portfolio & practice" }, className: nodeBase },
+    { id: "target1", position: { x: 500, y: 0 }, data: { label: "Target role A" }, className: nodeBase },
+    { id: "target2", position: { x: 520, y: 150 }, data: { label: "Target role B" }, className: nodeBase },
+    { id: "target3", position: { x: 520, y: 300 }, data: { label: "Target role C" }, className: nodeBase },
+  ]), []);
 
-    const nodes: RFNode[] = [
-      ...froms.map((s, i) => ({
-        id: `from:${s}`,
-        position: { x: colX.from, y: 40 + i * rowH },
-        data: { label: s, kind: "from" as const},
-      })),
-      ...bridges.map((s, i) => ({
-        id: `bridge:${s}`,
-        position: { x: colX.bridge, y: 40 + i * rowH },
-        data: { label: s, kind: "bridge" as const},
-      })),
-      ...roles.map((r, i) => ({
-        id: `role:${r}`,
-        position: { x: colX.role, y: 40 + i * rowH },
-        data: { label: r, kind: "role" as const},
-      })),
+  const edges = useMemo(() => {
+    const strength = planMode === "Aggressive" ? 0.85 : planMode === "Safe" ? 0.55 : 0.7;
+    return [
+      { id: "e1", source: "you", target: "bridge1", label: `${Math.round(strength * 65)}%`, markerEnd: { type: "arrowclosed" } },
+      { id: "e2", source: "you", target: "bridge2", label: `${Math.round(strength * 50)}%`, markerEnd: { type: "arrowclosed" } },
+      { id: "e3", source: "bridge1", target: "target1", label: `${Math.round(strength * 60)}%`, markerEnd: { type: "arrowclosed" } },
+      { id: "e4", source: "bridge2", target: "target2", label: `${Math.round(strength * 55)}%`, markerEnd: { type: "arrowclosed" } },
+      { id: "e5", source: "bridge2", target: "target3", label: `${Math.round(strength * 45)}%`, markerEnd: { type: "arrowclosed" } }
     ];
+  }, [planMode]);
 
-    // edges with p50 as label
-    const edges: RFEdge[] = [];
-    filtered.forEach((t, i) => {
-      const e1 = {
-        id: `e1:${t.fromSkill}->${t.bridgeSkill}:${i}`,
-        source: `from:${t.fromSkill}`,
-        target: `bridge:${t.bridgeSkill}`,
-        label: `${t.confidence.p50}%`,
-        markerEnd: { type: MarkerType.ArrowClosed },
-        data: { ...t.confidence, exampleProfileIds: t.exampleProfileIds },
-      };
-      const e2 = {
-        id: `e2:${t.bridgeSkill}->${t.toRole}:${i}`,
-        source: `bridge:${t.bridgeSkill}`,
-        target: `role:${t.toRole}`,
-        label: `${t.confidence.p50}%`,
-        markerEnd: { type: MarkerType.ArrowClosed },
-        data: { ...t.confidence, exampleProfileIds: t.exampleProfileIds },
-      };
-      edges.push(e1 as RFEdge, e2 as RFEdge);
-    });
-
-    setRfNodes(nodes);
-    setRfEdges(edges);
-  }, [transitions, activeBridge, setRfNodes, setRfEdges]);
-
-
-  // --------- Agent orchestration state ---------
-  const [agents, setAgents] = useState<AgentState>(newAgentState());
-  const resetAgents = () => { setAgents(newAgentState()); setClusterInfo(null); };
-  // helpers
-  const appendLog = useCallback((k: AgentKey, line: string) => {
-    setAgents((prev) => ({
-      ...prev,
-      [k]: {
-        ...prev[k],
-        log: [...prev[k].log, line],
-      },
-    }));
-  }, []);
-  const setStatus = useCallback((k: AgentKey, status: AgentStatus) => {
-    setAgents((prev) => ({ ...prev, [k]: { ...prev[k], status } }));
-  }, []);
-  const setProgress = useCallback((k: AgentKey, pct: number) => {
-    setAgents((prev) => ({ ...prev, [k]: { ...prev[k], progress: pct } }));
-  }, []);
-
-  const getObservedHours = (w: WeeklyPlanWeek) =>
-  (w.tasks || []).reduce((sum, t) => sum + (t.done ? t.estHours : 0), 0);
-
-
-  function autoAdjustPlan(startWeek: number) {
-    if (!weeklyPlan.length) return;
-
-    // Make a deep-ish copy
-    const plan = weeklyPlan.map(w => ({
-      ...w,
-      tasks: [...w.tasks],
-    }));
-
-    for (let i = startWeek - 1; i < plan.length; i++) {
-      const w = plan[i];
-      const observed = getObservedHours(w);
-      const slack = w.plannedHours - observed;
-
-      if (slack <= 0) continue; // no slip
-
-      // Identify unfinished tasks (lowest priority first)
-      const unfinished = w.tasks
-        .filter(t => !t.done)
-        .sort((a, b) => {
-          const rank = { low: 2, med: 1, high: 0 };
-          return rank[a.priority] - rank[b.priority];
-        });
-
-      let carry = 0;
-      for (const t of unfinished) {
-        if (carry >= slack) break;
-        // Move this task to next week
-        const nextIdx = Math.min(i + 1, plan.length - 1);
-        plan[nextIdx].tasks.push({ ...t });
-        plan[nextIdx].carriesOverFrom = plan[nextIdx].carriesOverFrom ?? w.week;
-        // Remove from current week
-        w.tasks = w.tasks.filter(x => x.id !== t.id);
-        carry += t.estHours;
-      }
-    }
-
-    setWeeklyPlan(plan);
-  }
-
-  function toggleTask(weekNum: number, taskId: string) {
-    setWeeklyPlan(prev =>
-      prev.map(w =>
-        w.week === weekNum
-          ? { ...w, tasks: w.tasks.map(t => (t.id === taskId ? { ...t, done: !t.done } : t)) }
-          : w
-      )
-    );
-  }
-
-
-  async function fetchJobs() {
-  setLoading(true);
-  setMessage("Fetching jobs...");
-  try {
-    const params = new URLSearchParams({
-      role,
-      location,
-      remote: String(remoteOnly),
-      recencyDays: "60",
-    }).toString();
-    const res = await fetch(`/api/jobs?${params}`);
-    const data = await res.json();
-
-    const list: JobResult[] = data.jobs || [];
-    setJobs(list);
-
-    // initialize selected job + citations for downstream agents
-    const firstId = list[0]?.id ?? null;
-    setSelectedJobId(firstId);
-    if (firstId) {
-      const top3 = list.slice(0, 3).map((j) => j.id);
-      setCitedJobIds(Array.from(new Set([firstId, ...top3])).slice(0, 5));
-    }
-
-    setMessage(`Fetched ${data.count ?? list.length} jobs`);
-  } catch {
-    setMessage("Error fetching jobs");
-  } finally {
-    setLoading(false);
-  }
-}
-
-  async function findSimilar() {
-    setLoading(true);
-    setMessage("Finding similar jobs...");
-    try {
-      const res = await fetch("/api/similar?userId=1");
-      const data = await res.json();
-      console.log(data.jobs)
-      setJobs(data.jobs || []);
-
-      setMessage(`Found ${data.jobs?.length || 0} jobs`);
-    } catch {
-      setMessage("Error finding similar jobs");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function analyzeGaps(jobId: string) {
-    setLoading(true);
-    setMessage("Analyzing skill gaps...");
-    try {
-      const res = await fetch(`/api/gaps?userId=1&jobId=${jobId}&mode=embedding`);
-      const data = await res.json();
-      setGapsByJob((prev) => ({ ...prev, [jobId]: data.missing ?? [] }));
-      setMessage(`Found ${data.missing?.length ?? 0} gaps`);
-    } catch {
-      setMessage("Error analyzing gaps");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function fetchResources(skill: string) {
-    setLoading(true);
-    setMessage(`Finding resources for ${skill}...`);
-    try {
-      const res = await fetch(
-        `/api/resources?skill=${encodeURIComponent(skill)}`
-      );
-      const data = await res.json();
-      setResourcesBySkill((prev) => ({
-        ...prev,
-        [skill]: data.resources ?? [],
-      }));
-      setMessage(`Found ${data.resources?.length ?? 0} resources`);
-    } catch {
-      setMessage("Error finding resources");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function simulate(jobId: string) {
-    setLoading(true);
-    setMessage("Simulating 12-week path...");
-    setSelectedJobId(jobId);
-    try {
-      const res = await fetch("/api/simulate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: "1", jobId, weeklyHours }),
-      });
-      const data = await res.json();
-      setSimSteps(data.steps ?? []);
-      setMessage(`Simulation ready (${data.steps?.length ?? 0} weeks)`);
-    } catch {
-      setMessage("Error running simulation");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function onRunSSE(params: Record<string, string>) {
-    const qs = new URLSearchParams(params).toString();
-    const es = new EventSource(`/api/agents/run?${qs}`);
-    return es;
-  }
-
-  async function saveProfile() {
-
-
-  const res = await fetch("/api/ingest/profile", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      userId: "1",
-      resumeText: resume, 
-      shortForm: {
-        yearsExperience: yearsExp === '' ? null : Number(yearsExp),
-        education: educationText,
-      },
-    }),
-  });
-  const data = await res.json();
-  setMessage(data.ok ? "Profile saved" : data.error || "Failed to save profile");
-}
-
-
-
-
-  // ------------- Agent wrappers -------------
-  // Agent A
-  const onRunA = () => {
-    setAgents((s) => ({ ...s, A: { ...s.A, status: "running", log: [], progress: 0 } }));
-    const es = onRunSSE({
-      agent: "A",
-      userId: "1",
-      // WARNING: querystrings have length limits; for long resumes, switch to POST streaming in prod.
-      resume: resume.slice(0, 3000),
-    });
-    es.addEventListener("log", (e: any) =>
-      appendLog("A", JSON.parse(e.data).line)
-    );
-    es.addEventListener("progress", (e: any) =>
-      setProgress("A", JSON.parse(e.data).progress)
-    );
-    es.addEventListener("status", (e: any) => {
-      const { status } = JSON.parse(e.data);
-      setStatus("A", status as any);
-      if (status !== "running") es.close();
-    });
-  };
-
-  // Agent B
-  const onRunB = () => {
-    setAgents((s) => ({ ...s, B: { ...s.B, status: "running", log: [], progress: 0 } }));
-    const es = onRunSSE({
-      agent: "B",
-      userId: "1",
-      role,
-      location,
-      remote: String(remoteOnly),
-    });
-    es.addEventListener("log", (e: any) =>
-      appendLog("B", JSON.parse(e.data).line)
-    );
-    es.addEventListener("progress", (e: any) =>
-      setProgress("B", JSON.parse(e.data).progress)
-    );
-    es.addEventListener("payload", (e: any) => {
-      const p = JSON.parse(e.data);
-      if (p.jobs) {
-        setJobs(p.jobs);
-        // initialize selector + citations
-        const id = p.jobs[0]?.id;
-        if (id) {
-          setSelectedJobId(id);
-          setCitedJobIds(Array.from(new Set([id, ...p.jobs.slice(0, 3).map((j: any) => j.id)])));
-        }
-      }
-    });
-    es.addEventListener("status", (e: any) => {
-      const { status } = JSON.parse(e.data);
-      setStatus("B", status as any);
-      if (status !== "running") es.close();
-    });
-  };
-
-  // Agent C
-  const onRunC = () => {
-    const jid = selectedJobId || jobs[0]?.id;
-    if (!jid) { setMessage("Select or fetch a target job before running Agent C."); return; }
-    setAgents((s) => ({ ...s, C: { ...s.C, status: "running", log: [], progress: 0 } }));
-    const es = onRunSSE({  agent: "C",
-            userId: "1",
-            jobId: jid,
-            timeframeMin: String(goalMonths[0]),
-            timeframeMax: String(goalMonths[1])});
-    es.addEventListener("log", (e: any) => appendLog("C", JSON.parse(e.data).line));
-    es.addEventListener("progress", (e: any) =>
-      setProgress("C", JSON.parse(e.data).progress)
-    );
-    es.addEventListener("payload", (e: any) => {
-      const { gaps, cluster, citations, pathExplorer } = JSON.parse(e.data);
-      setGapsByJob((prev) => ({ ...prev, [jid]: gaps || [] }));
-      setClusterInfo(cluster || null); // optional: display "Matched cluster: Backend SWE (0.91)"
-      if (citations?.length) {
-         setCitationsByJob((prev) => ({ ...prev, [jid]: citations }));
-       }
-      if (pathExplorer) {
-          setBridgeSkills(pathExplorer.bridgeSkills || []);
-          setTransitions(pathExplorer.transitions || []);
-          if (pathExplorer.exampleProfiles) {
-            setExampleProfiles((prev) => ({ ...prev, ...pathExplorer.exampleProfiles }));
-          }
-      }
-    });
-    es.addEventListener("status", (e: any) => {
-      const { status } = JSON.parse(e.data);
-      setStatus("C", status as any);
-    if (status !== "running") es.close();
-  });
-};
-
-// Agent D
-const onRunD = () => {
-  const jid = selectedJobId || jobs[0]?.id;
-  const skills = (gapsByJob[jid] || []).join(",");
-  setAgents((s) => ({ ...s, D: { ...s.D, status: "running", log: [], progress: 0 } }));
-  const es = onRunSSE({  agent: "D",
-  userId: "1",
-  skills,
-  timeframeMin: String(goalMonths[0]),
-  timeframeMax: String(goalMonths[1]),
- });
-  es.addEventListener("log", (e: any) => appendLog("D", JSON.parse(e.data).line));
-  es.addEventListener("progress", (e: any) =>
-    setProgress("D", JSON.parse(e.data).progress)
-  );
-  es.addEventListener("payload", (e: any) => {
-    const { resources, paths: p, weeklyPlan: wp } = JSON.parse(e.data);
-    setResourcesBySkill((prev) => ({ ...prev, ...resources }));
-    if (p) {
-      setPaths(p);
-      setSavedPaths(p);
-      setSelectedPathIds(p.slice(0, 2).map((x: any) => x.pathId)); // preselect top 2
-    }
-    if (wp?.length) setWeeklyPlan(wp);
-  });
-  es.addEventListener("status", (e: any) => {
-    const { status } = JSON.parse(e.data);
-    setStatus("D", status as any);
-    if (status !== "running") es.close();
-  });
-};
-
-// Agent E — multi-path (8/10/15 h/week overlay)
-const onRunE = () => {
-  const jid = selectedJobId || jobs[0]?.id;
-  if (!jid) { setMessage("Select or fetch a target job before running Agent E."); return; }  setAgents((s) => ({ ...s, E: { ...s.E, status: "running", log: [], progress: 0 } }));
-  setMultiSeries([]); // reset
-  const es = onRunSSE({
-    agent: "E",
-    userId: "1",
-    jobId: jid,
-    variants: "8,10,15",
-    timeframeMin: String(goalMonths[0]),
-    timeframeMax: String(goalMonths[1]),
-    pathIds: selectedPathIds.join(","),
-    risk: String(riskTolerance),          // NEW
-  });
-  es.addEventListener("log", (e: any) => appendLog("E", JSON.parse(e.data).line));
-  es.addEventListener("progress", (e: any) =>
-    setProgress("E", JSON.parse(e.data).progress)
-  );
-  es.addEventListener("payload", (e: any) => {
-    const { series, salary } = JSON.parse(e.data);
-    setMultiSeries(series || []);
-    if (series) setSavedSeries(series);
-    // also keep single-series backward compat
-    if (salary) setSalaryTarget(salary);
-    
-    const base = series?.find((s: any) => s.label === "10h/wk") || series?.[0];
-    if (base) setSimSteps(base.steps);
-  });
-  es.addEventListener("status", (e: any) => {
-    const { status } = JSON.parse(e.data);
-    setStatus("E", status as any);
-    if (status !== "running") es.close();
-  });
-};
-
-// Agent F — pass citations
-const onRunF = () => {
-  setAgents((s) => ({ ...s, F: { ...s.F, status: "running", log: [], progress: 0 } }));
-  const es = onRunSSE({
-    agent: "F",
-    userId: "1",
-    citedJobs: citedJobIds.join(","),
-    targetRole: goalRole || (jobs.find(j=>j.id===selectedJobId)?.title ?? "Software Engineer"),
-  });
-  es.addEventListener("log", (e: any) => appendLog("F", JSON.parse(e.data).line));
-  es.addEventListener("progress", (e: any) =>
-    setProgress("F", JSON.parse(e.data).progress)
-  );
-  es.addEventListener("payload", (e: any) => {
-    const { citedJobs, salaryTarget, salaryBaseline, delta } = JSON.parse(e.data);
-    const lookup = new Map(jobs.map((j) => [j.id, j]));
-    const picked = citedJobs
-      .map((id: string, i: number) => {
-        const j = lookup.get(id);
-        return j ? `[${i + 1}] ${j.title} — ${j.url || "N/A"}` : null;
-      })
-      .filter(Boolean)
-      .join("\n");
-
-    const top = jobs.find((j) => j.id === (selectedJobId || jobs[0]?.id));
-    const gaps = top ? (gapsByJob[top.id] || []) : [];
-    const summary = [
-      `Top target: ${top ? `${top.title} @ ${top.company} (${top.location})` : "N/A"}`,
-      top ? `Current match score: ${(top.score * 100).toFixed(1)}%` : "",
-      gaps.length ? `Primary gaps: ${gaps.join(", ")}` : "No significant gaps detected.",
-      multiSeries.length
-        ? `Projected qualification after 12 weeks: ${multiSeries
-            .map((s) => `${s.label} → ${s.steps.at(-1)?.score ?? "—"}%`)
-            .join(" | ")}`
-        : simSteps.length
-        ? `Projected qualification in 12 weeks: ${simSteps.at(-1)?.score ?? "—"}%`
-        : "No simulation data yet.",
-      picked ? `Citations:\n${picked}` : "",
-    ]
-      .filter(Boolean)
-      .join("\n");
-
-    // Build evidence once and append to the summary, then set a SINGLE time.
-    let evidence = "";
-    if (selectedJobId && citationsByJob[selectedJobId]?.length) {
-      const lines = citationsByJob[selectedJobId]
-        .slice(0, 6)
-        .map((c) => `• ${c.name}: “…${c.snippet.slice(0, 120)}…”`);
-      evidence = `\n\nEvidence:\n${lines.join("\n")}`;
-    }
-    setExplanation(summary + evidence);
-
-    setSalaryTarget(salaryTarget || null);
-    setSalaryBaseline(salaryBaseline || null);
-    setSalaryDelta(delta || null);
-  });
-
-  es.addEventListener("status", (e: any) => {
-    const { status } = JSON.parse(e.data);
-    setStatus("F", status as any);
-    if (status !== "running") es.close();
-  });
-};
-
-  const onRunG = () => {
-    setAgents((s) => ({ ...s, G: { ...s.G, status: "running", log: [], progress: 0 } }));
-    const es = onRunSSE({
-      agent: "G",
-      userId: "1",
-      jobId: selectedJobId || jobs[0]?.id || "",
-      decisions: selectedDecisionIds.join(","),   // e.g. "self-study,bootcamp"
-      risk: String(riskTolerance),                // 1,2,3 affects assumptions
-      timeframeMin: String(goalMonths[0]),
-      timeframeMax: String(goalMonths[1]),
-      weeklyHours: String(weeklyHours),
-    });
-
-    es.addEventListener("log", (e: any) => appendLog("G", JSON.parse(e.data).line));
-    es.addEventListener("progress", (e: any) => setProgress("G", JSON.parse(e.data).progress));
-    es.addEventListener("payload", (e: any) => {
-      // expected payload: { bands: Record<decisionId, OutcomeBand[]>, summaries: DecisionSummary[] }
-      const { bands, summaries } = JSON.parse(e.data);
-      if (bands) setCompareSeries(bands);
-      if (summaries) setDecisionSummaries(summaries);
-    });
-    es.addEventListener("status", (e: any) => {
-      const { status } = JSON.parse(e.data);
-      setStatus("G", status as any);
-      if (status !== "running") es.close();
-    });
-  };
-
-  const onRunH = () => {
-    setAgents((s) => ({ ...s, H: { ...s.H, status: "running", log: [], progress: 0 } }));
-    const es = onRunSSE({
-      agent: "H",
-      userId: "1",
-      role,
-      location,
-      targetRole: goalRole || role,
-      weeklyHours: String(weeklyHours),
-      yearsExp: String(yearsExp || ""),
-    });
-    es.addEventListener("log", (e: any) => appendLog("H", JSON.parse(e.data).line));
-    es.addEventListener("progress", (e: any) => setProgress("H", JSON.parse(e.data).progress));
-    es.addEventListener("payload", (e: any) => {
-      const { profiles } = JSON.parse(e.data);
-      if (profiles?.length) setSimilarReceipts(profiles);
-    });
-    es.addEventListener("status", (e: any) => {
-      const { status } = JSON.parse(e.data);
-      setStatus("H", status as any);
-      if (status !== "running") es.close();
-    });
-  };
-
-
-
-
-  const runAll = async () => {
-  // run sequentially to keep UX simple
-  onRunA();
-  // wait a bit for A to finish before starting B (quick heuristic for demo)
-  setTimeout(() => onRunB(), 400);
-  setTimeout(() => onRunC(), 1200);
-  setTimeout(() => onRunD(), 1800);
-  setTimeout(() => onRunE(), 2400);
-  setTimeout(() => onRunF(), 3200);
-  setTimeout(() => onRunG(), 3800);
-  setTimeout(() => onRunH(), 4400);
-};
-
-
-
-  // compact circular score pill for job cards
-  const ScorePill: React.FC<{ score: number }> = ({ score }) => {
-    const pct = Math.max(0, Math.min(100, Math.round(score)));
-    return (
-      <div className="relative inline-flex items-center justify-center w-12 h-12 rounded-full"
-        style={{ background: `conic-gradient(hsl(var(--primary)) ${pct*3.6}deg, hsl(var(--muted-foreground)) 0)` }}>
-        <div className="absolute w-9 h-9 rounded-full bg-background border" />
-        <motion.span
-          className="text-xs font-semibold"
-          key={pct}
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.15 }}
-        >
-          {pct}%
-        </motion.span>
+  return (
+    <div className="h-[280px] overflow-hidden rounded-xl border dark:border-gray-800">
+      <ReactFlow nodes={nodes as any} edges={edges as any} fitView>
+        <MiniMap zoomable pannable />
+        <Controls />
+        <Background gap={16} />
+      </ReactFlow>
+      <div className="p-3 text-xs text-gray-500 dark:text-gray-400">
+        Confidence on arrows shows how likely each step is, given your plan mode and study time. Examples on hover (mock).
       </div>
-    );
-  };
-
-  // Hours slider with label
-  const HoursSlider: React.FC<{ value:number; onChange:(v:number)=>void }> = ({ value, onChange }) => (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <Label className="text-sm">Weekly learning hours</Label>
-        <span className="text-[11px]  text-muted-foreground">{value}h/wk</span>
-      </div>
-      <Slider
-        value={[value]}
-        min={4}
-        max={20}
-        step={1}
-        onValueChange={(v)=> onChange(v[0] ?? value)}
-      />
     </div>
   );
+}
 
-  // Compact, expandable job row
-  const JobRow: React.FC<{ job: JobResult }> = ({ job }) => {
-    const isOpen = !!openJobIds[job.id];
-    return (
-      <div className="border rounded-xl p-3">
-        <button
-          className="w-full text-left"
-          onClick={() => toggleJobRow(job.id)}
-          aria-expanded={isOpen}
-        >
-          <div className="flex items-center justify-between">
-            <div className="min-w-0">
-              <div className="text-sm font-medium truncate">{job.title}</div>
-              <div className="text-[11px]  text-muted-foreground truncate">
-                {job.company} • {job.location}
-              </div>
+// --- Decision Duel ---
+function DecisionDuel({ hours, location }: { hours: number; location: string }) {
+  const [choiceA, setChoiceA] = useState("Stay & upskill (self-study)");
+  const [choiceB, setChoiceB] = useState("Pivot via course/bootcamp");
+
+  const ttfoData = useMemo(() => makeTTFO(16 - Math.round(hours / 4), 4), [hours]);
+
+  const baseComp = location === "Singapore" ? 82000 : 70000;
+
+  const metricsA = {
+    firstOffer: `${clamp(10 - Math.round(hours / 6), 4, 18)} wks`,
+    comp1y: `$${(baseComp * 0.95).toLocaleString()}`,
+    comp3y: `$${Math.round(baseComp * 1.55).toLocaleString()}`,
+    risk: "Medium",
+    burnout: "Low"
+  };
+  const metricsB = {
+    firstOffer: `${clamp(12 - Math.round(hours / 7), 4, 20)} wks`,
+    comp1y: `$${Math.round(baseComp * 1.05).toLocaleString()}`,
+    comp3y: `$${Math.round(baseComp * 1.45).toLocaleString()}`,
+    risk: "Medium-High",
+    burnout: "Medium"
+  };
+
+  return (
+    <div className="grid gap-5 lg:grid-cols-3">
+      <div className="space-y-3 rounded-2xl border p-4 dark:border-gray-800">
+        <div className="mb-2 text-sm font-semibold">Pick two choices</div>
+        <label className="text-xs text-gray-500">Choice A</label>
+        <select className="w-full rounded-lg border bg-white p-2 text-sm dark:border-gray-800 dark:bg-gray-900" value={choiceA} onChange={(e) => setChoiceA(e.target.value)}>
+          <option>Stay & upskill (self-study)</option>
+          <option>Stay & upskill (certificate)</option>
+          <option>Internal move (new function)</option>
+          <option>New employer (similar role)</option>
+        </select>
+        <label className="mt-3 text-xs text-gray-500">Choice B</label>
+        <select className="w-full rounded-lg border bg-white p-2 text-sm dark:border-gray-800 dark:bg-gray-900" value={choiceB} onChange={(e) => setChoiceB(e.target.value)}>
+          <option>Pivot via course/bootcamp</option>
+          <option>Graduate studies (part-time)</option>
+          <option>Freelance/contract for exposure</option>
+          <option>Career break → re-entry</option>
+        </select>
+        <div className="mt-4 flex items-center gap-2 text-xs text-gray-500">
+          <Info size={14} />
+          Numbers are sample estimates to show the UI.
+        </div>
+      </div>
+
+      <div className="space-y-3 lg:col-span-2">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <Metric label="First offer date" value={metricsA.firstOffer + " / " + metricsB.firstOffer} hint={"A / B (weeks)"} />
+          <Metric label="1‑yr total pay" value={metricsA.comp1y + " / " + metricsB.comp1y} />
+          <Metric label="3‑yr ceiling" value={metricsA.comp3y + " / " + metricsB.comp3y} />
+          <Metric label="Burnout risk" value={metricsA.burnout + " / " + metricsB.burnout} />
+        </div>
+        <div className="rounded-2xl border p-3 dark:border-gray-800">
+          <div className="mb-2 flex items-center gap-2 text-sm font-semibold"><LineChart size={16} />Time‑to‑First‑Offer distribution</div>
+          <div className="h-56 w-full">
+            <ResponsiveContainer>
+              <AreaChart data={ttfoData} margin={{ left: 10, right: 10, top: 10, bottom: 10 }}>
+                <defs>
+                  <linearGradient id="gA" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopOpacity={0.4} />
+                    <stop offset="95%" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="gB" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopOpacity={0.3} />
+                    <stop offset="95%" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="week" tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} />
+                <Tooltip />
+                <Legend />
+                <Area type="monotone" dataKey="Safe" strokeWidth={2} fillOpacity={0.4} fill="url(#gA)" />
+                <Area type="monotone" dataKey="Aggressive" strokeWidth={2} fillOpacity={0.3} fill="url(#gB)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- Explainable Trade-offs ---
+function Tradeoffs() {
+  const data = makeImportances()
+    .sort((a, b) => b.lift - a.lift)
+    .map((d) => ({ ...d, pct: Math.round(d.lift * 100) }));
+
+  return (
+    <div className="rounded-2xl border p-4 dark:border-gray-800">
+      <div className="mb-2 flex items-center gap-2 text-sm font-semibold"><BarChart3 size={16} />What moves the needle</div>
+      <div className="h-64 w-full">
+        <ResponsiveContainer>
+          <BarChart data={data} layout="vertical" margin={{ left: 20, right: 20, top: 10, bottom: 10 }}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis type="number" tickFormatter={(v) => `${v}%`} />
+            <YAxis type="category" dataKey="factor" width={160} />
+            <Tooltip formatter={(v: number) => [`${v}% lift`, "Factor"]} />
+            <Legend />
+            <Bar dataKey="pct" radius={[6, 6, 6, 6]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <p className="mt-2 text-xs text-gray-500">Lift shows estimated increase in interview chances when you add one item to your profile. These are sample values for the demo.</p>
+    </div>
+  );
+}
+
+// --- Week-by-Week Plan ---
+function WeekPlan({ hours }: { hours: number }) {
+  const totalWeeks = 12;
+  const perWeek = clamp(Math.round(hours), 4, 20);
+  const tasks = [
+    { w: 1, t: "Clarify goals, gather achievements (6h)" },
+    { w: 2, t: "Refresh core skills, draft portfolio (8h)" },
+    { w: 3, t: "Create 1–2 work samples (8h)" },
+    { w: 4, t: "Resume & profile revamp (6h)" },
+    { w: 5, t: "Mock interviews & feedback (8h)" },
+    { w: 6, t: "Case practice / role-plays (6h)" },
+    { w: 7, t: "Targeted learning module (6h)" },
+    { w: 8, t: "Networking: 5 warm reach-outs (3h)" },
+    { w: 9, t: "Applications & tailored notes (6h)" },
+    { w: 10, t: "Portfolio polish & metrics (6h)" },
+    { w: 11, t: "Interview loops & follow-ups (4h)" },
+    { w: 12, t: "Offer prep & negotiation basics (6h)" },
+  ];
+
+  return (
+    <div className="rounded-2xl border p-4 dark:border-gray-800">
+      <div className="mb-2 flex items-center gap-2 text-sm font-semibold"><Calendar size={16} />Week‑by‑Week Plan (12 weeks)</div>
+      <ul className="grid gap-2 md:grid-cols-2">
+        {tasks.map((x) => (
+          <li key={x.w} className="flex items-start gap-3 rounded-xl border p-3 text-sm dark:border-gray-800">
+            <div className="mt-1 h-6 w-6 shrink-0 rounded-lg border text-center text-xs font-semibold leading-6 dark:border-gray-700">{x.w}</div>
+            <div>
+              <div className="font-medium">{x.t}</div>
+              <div className="text-xs text-gray-500">Target {perWeek} hours/week · Shift tasks if you fall behind—plan auto‑adjusts.</div>
             </div>
-            <div className="flex items-center gap-3">
-              <ScorePill score={job.score * 100} />
-              {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// --- People Like Me ---
+function PeopleLikeMe() {
+  const people = [
+    { name: "A., 26", from: "Assistant", to: "Coordinator", time: "5 months", pay: "$38k → $48k", note: "Portfolio + referral" },
+    { name: "K., 29", from: "Analyst", to: "Associate", time: "4 months", pay: "$52k → $65k", note: "Certificate + networking" },
+    { name: "S., 31", from: "Operator", to: "Specialist", time: "7 months", pay: "$45k → $60k", note: "3 samples + blog" },
+  ];
+  return (
+    <div className="rounded-2xl border p-4 dark:border-gray-800">
+      <div className="mb-2 flex items-center gap-2 text-sm font-semibold"><Users size={16} />People like me (examples)</div>
+      <div className="grid gap-3 md:grid-cols-3">
+        {people.map((p, i) => (
+          <div key={i} className="rounded-xl border p-3 text-sm shadow-sm dark:border-gray-800">
+            <div className="mb-1 font-semibold">{p.name}</div>
+            <div className="text-xs text-gray-600 dark:text-gray-300">{p.from} → {p.to}</div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Chip>Time: {p.time}</Chip>
+              <Chip>Pay: {p.pay}</Chip>
+              <Chip>{p.note}</Chip>
             </div>
           </div>
-        </button>
-
-        <AnimatePresence initial={false}>
-          {isOpen && (
-            <motion.div {...fadeSlide} className="mt-3 space-y-3">
-              <div className="flex flex-wrap gap-2">
-                {job.url && (
-                  <a href={job.url} target="_blank" rel="noreferrer" className="underline text-xs">
-                    View posting
-                  </a>
-                )}
-                <Button size="sm" variant="secondary" onClick={() => analyzeGaps(job.id)} disabled={loading}>
-                  Analyze gaps
-                </Button>
-                <Button
-                  size="sm"
-                  variant={selectedJobId === job.id ? "default" : "outline"}
-                  onClick={() => {
-                    setSelectedJobId(job.id);
-                    const top3 = jobs.slice(0, 3).map((j) => j.id);
-                    setCitedJobIds(Array.from(new Set([job.id, ...top3])).slice(0, 5));
-                    setExplanation("");
-                  }}
-                >
-                  Set target
-                </Button>
-              </div>
-
-              {(!gapsByJob[job.id]?.length) && (
-                <p className="text-[11px] text-muted-foreground">
-                  Tip: run <span className="font-medium">Analyze gaps</span> to unlock resources.
-                </p>
-              )}
-
-              {gapsByJob[job.id]?.length ? (
-                <div className="space-y-2">
-                  <div className="flex flex-wrap gap-1">
-                    {gapsByJob[job.id].map((skill) => (
-                      <Badge key={skill} variant="secondary" className="text-[11px]">{skill}</Badge>
-                    ))}
-                  </div>
-
-                  {/* keep your resources block, but tighten paddings */}
-                  <div className="space-y-2">
-                    {gapsByJob[job.id].map((skill) =>
-                      resourcesBySkill[skill]?.length ? (
-                        <div key={`res-${skill}`} className="rounded-lg border p-2">
-                          <div className="text-xs font-medium mb-1">Resources for {skill}</div>
-                          <ul className="list-disc pl-4 space-y-1">
-                            {resourcesBySkill[skill].map((r, i) => (
-                              <li key={`${skill}-${i}`} className="text-xs">
-                                <a href={r.url} target="_blank" rel="noreferrer" className="underline">{r.title}</a>{" "}
-                                <span className="text-muted-foreground">
-                                  • {r.provider}{r.hours_estimate ? ` • ~${r.hours_estimate}h` : ""}
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      ) : (
-                        <Button
-                          key={`btn-${skill}`}
-                          size="sm"
-                          variant="outline"
-                          onClick={() => fetchResources(skill)}
-                          disabled={loading}
-                        >
-                          Find {skill} resources
-                        </Button>
-                      )
-                    )}
-                  </div>
-                </div>
-              ) : null}
-            </motion.div>
-          )}
-        </AnimatePresence>
+        ))}
       </div>
-    );
-
-  };
-
-
-  const DashboardShell: React.FC<{
-    title?: string;
-    actions?: React.ReactNode;
-    sidebar?: React.ReactNode; // ← can keep prop for compatibility but we won't render it
-    children: React.ReactNode;
-  }> = ({ title = "Career Clone", actions, children }) => (
-    <div className="mx-auto max-w-6xl">
-      <header className="sticky top-0 z-30 bg-background/80 backdrop-blur border-b">
-        <div className="px-5 py-3 flex items-center justify-between">
-          <h1 className="text-base font-semibold tracking-tight">{title}</h1>
-          <div className="flex items-center gap-2">{actions}</div>
-        </div>
-      </header>
-
-      <section className="p-5 space-y-6">
-        {children}
-      </section>
+      <p className="mt-2 text-xs text-gray-500">Examples are anonymized and simplified. In the real app, each card links to sources and proof.</p>
     </div>
   );
+}
 
-
-  // compact KPI strip (stat cards)
-  const KPICard = ({ label, value, hint }: { label: string; value: React.ReactNode; hint?: string }) => (
-    <div className="rounded-xl border p-3">
-      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className="text-sm font-semibold">{value}</div>
-      {hint ? <div className="text-[11px]  text-muted-foreground">{hint}</div> : null}
-    </div>
-  );
-
-  // empty state
-  const EmptyState = ({ title, hint }: { title: string; hint?: string }) => (
-    <div className="rounded-xl border p-8 text-center">
-      <div className="text-sm font-medium">{title}</div>
-      {hint ? <div className="text-[11px]  text-muted-foreground mt-1">{hint}</div> : null}
-    </div>
-  );
-
-  const Section: React.FC<{ title: string; defaultOpen?: boolean; actions?: React.ReactNode; children: React.ReactNode }> = ({ title, defaultOpen = true, actions, children }) => {
-  const [open, setOpen] = useState(defaultOpen);
+// --- Evidence / Receipts ---
+function Evidence() {
+  const items = [
+    { k: "Salary survey (region, 2024)", v: "Median comp by level & function" },
+    { k: "Job posts (target roles)", v: "Common requirements & keywords" },
+    { k: "Alumni stories", v: "Typical pivot timelines" },
+    { k: "Program outcomes", v: "Portfolio impact on interviews" },
+  ];
   return (
-    <div className="rounded-xl border">
-      <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between px-4 py-3">
-        <h2 className="text-sm font-semibold">{title}</h2>
-        <div className="flex items-center gap-2">{actions}</div>
-      </button>
-      <Separator />
-      {open ? <div className="p-4 space-y-4">{children}</div> : null}
+    <div className="rounded-2xl border p-4 dark:border-gray-800">
+      <div className="mb-2 flex items-center gap-2 text-sm font-semibold"><ListChecks size={16} />Receipts (why we think this)</div>
+      <ul className="space-y-2 text-sm">
+        {items.map((it, i) => (
+          <li key={i} className="flex items-start gap-2">
+            <Info size={16} className="mt-0.5 shrink-0" />
+            <div>
+              <div className="font-medium">{it.k}</div>
+              <div className="text-xs text-gray-500">{it.v} · With links and cohort sizes in the full product.</div>
+            </div>
+          </li>
+        ))}
+      </ul>
     </div>
   );
-};
+}
 
+// --- Risks & Mitigations ---
+function Risks() {
+  const risks = [
+    { title: "Selection bias", body: "We show uncertainty and sample size behind every estimate." },
+    { title: "Outdated information", body: "We favor recent sources and down-weight old outcomes." },
+    { title: "Over-personalization", body: "You can switch between Safe, Balanced, Aggressive plans." },
+    { title: "Single-path thinking", body: "Compare multiple paths side-by-side before committing." },
+  ];
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      {risks.map((r, i) => (
+        <div key={i} className="rounded-xl border p-3 text-sm dark:border-gray-800">
+          <div className="mb-1 flex items-center gap-2 font-semibold"><Shield size={16} />{r.title}</div>
+          <p className="text-gray-600 dark:text-gray-300">{r.body}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// --- Main App ---
+export default function CareerAgentUI() {
+  const [hours, setHours] = useState(10);
+  const [risk, setRisk] = useState("Balanced");
+  const [location, setLocation] = useState("Singapore");
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+
+  const basePay = location === "Singapore" ? 82000 : 70000;
+
+  if (!profile) {
+    return <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white p-5 dark:from-gray-950 dark:to-gray-900">
+      <OnboardingForm onComplete={(p) => {
+        setProfile(p);
+      }} />
+    </div>;
+  }
 
   return (
-    <main>
-  <DashboardShell actions={ <> <Button size="sm" onClick={runAll}><Play className="mr-1 h-4 w-4"/>Run pipeline</Button> </> }>
-    {/* inject sidebar nav that controls activeTab */}
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white p-5 text-gray-900 dark:from-gray-950 dark:to-gray-900 dark:text-gray-100">
+      <div className="mx-auto max-w-7xl">
+        {/* Header */}
+        <header className="rounded-3xl border bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+          <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
+            <div>
+              <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
+                <Sparkles className="h-6 w-6" /> Career Strategy Studio
+              </h1>
+              <p className="mt-1 max-w-2xl text-sm text-gray-600 dark:text-gray-300">
+                Explore realistic paths, compare choices, and get a weekly plan for your career. Clear numbers, simple language, and sources.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Chip><Map className="mr-1 inline h-3 w-3" /> Path Explorer</Chip>
+              <Chip><GitBranch className="mr-1 inline h-3 w-3" /> Decision Duel</Chip>
+              <Chip><Calendar className="mr-1 inline h-3 w-3" /> Week Plan</Chip>
+            </div>
+          </div>
+        </header>
 
-              {/* KPI strip – small, glanceable */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-          <KPICard label="Openings" value={jobs.length || "—"} hint="from JSearch / similar" />
-          <KPICard label="Target hours" value={`${weeklyHours} h/wk`} hint="simulation input" />
-          <KPICard label="Qualification target" value={`${targetThreshold}%`} />
-          <KPICard label="Selected job" value={selectedJobId ? "Set" : "Not set"} hint={selectedJobId ? undefined : "Pick in Openings"} />
+        <div className="mt-6 grid gap-6 lg:grid-cols-[320px_1fr]">
+          <SidebarProfile profile={profile} />
+
+          <div className="space-y-6 lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto pr-1">
+            {/* Path Explorer */}
+            <Section title="Path Explorer" icon={<Layers className="h-5 w-5" />} actions={<div className="text-sm text-gray-500">Confidence bands shown on arrows</div>}>
+              <PathExplorer planMode={risk} />
+            </Section>
+
+            {/* Decision Duel */}
+            <Section title="Decision Duel" icon={<GitBranch className="h-5 w-5" />}>
+              <DecisionDuel hours={hours} location={location} />
+            </Section>
+
+            {/* Tradeoffs + Evidence */}
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Section title="Explainable trade‑offs" icon={<BarChart3 className="h-5 w-5" />}>
+                <Tradeoffs />
+              </Section>
+              <Section title="Receipts (evidence)" icon={<ListChecks className="h-5 w-5" />}>
+                <Evidence />
+              </Section>
+            </div>
+
+            {/* Week Plan + People Like Me */}
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Section title="Week‑by‑Week Plan" icon={<Calendar className="h-5 w-5" />} actions={<div className="flex items-center gap-2 text-xs"><Clock size={14} /> Target {hours} h/week</div>}>
+                <WeekPlan hours={hours} />
+              </Section>
+              <Section title="People like me" icon={<Users className="h-5 w-5" />}>
+                <PeopleLikeMe />
+              </Section>
+            </div>
+
+            {/* Footer / Risk cards */}
+            <Section title="Risks & safeguards" icon={<Shield className="h-5 w-5" />}>
+              <Risks />
+              <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                <RefreshCw size={14} />
+                We decay old data, show uncertainty clearly, and let you choose plan style.
+              </div>
+            </Section>
+
+            {/* CTA */}
+            <div className="rounded-2xl border bg-white p-5 text-center shadow-sm dark:border-gray-800 dark:bg-gray-900">
+              <div className="mx-auto max-w-2xl">
+                <h3 className="text-lg font-semibold">Ready to plug in real data?</h3>
+                <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                  Connect your resume, pick sources (job boards, salary surveys), and turn on live estimates.
+                </p>    
+                <button className="mt-3 inline-flex items-center gap-2 rounded-2xl border bg-gray-900 px-4 py-2 text-sm text-white shadow-sm transition hover:opacity-90 dark:bg-white dark:text-gray-900">
+                  <CircleDollarSign size={16} /> Continue to data setup <ArrowRight size={16} />
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
-
-      <section className="col-span-12 md:col-span-9 lg:col-span-10 space-y-6">
-
-        <Section title="Your Profile" defaultOpen>
-            {/* Resume uploader + Profile */}
-              <section className="rounded-xl border p-4 space-y-3">
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium">Resume</label>
-                  <Textarea
-                    value={resume}
-                    onChange={(e: any) => setResume(e.target.value)}
-                    placeholder="Write your resume here..."
-                    className="h-40"
-                    
-                  />
-                  
-                </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-start">
-
-              <div className="space-y-1">
-                <label className="block text-sm font-medium">Years of experience</label>
-                <Input
-                  type="number"
-                  min={0}
-                  max={50}
-                  value={yearsExp}
-                  onChange={(e) => setYearsExp(e.target.value === "" ? "" : Number(e.target.value))}
-                  placeholder="e.g., 4"
-                  className="w-28"
-                />
-              </div>
-
-              <div className="sm:col-span-3 space-y-1">
-                <label className="block text-sm font-medium">Education</label>
-                <Textarea
-                  value={educationText}
-                  onChange={(e) => setEducationText(e.target.value)}
-                  placeholder="e.g., BSc in Computer Science, University of X (2019)"
-                  className="h-20"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <Button variant="secondary" onClick={saveProfile}>Save profile</Button>
-            </div>
-              </section>
-          </Section>
-
-
-        <Section
-          title="Find Openings"
-          defaultOpen
-          actions={
-            <div className="flex gap-2">
-              <Button onClick={fetchJobs} disabled={loading} size="sm" variant="secondary">
-                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Fetch
-              </Button>
-              <Button onClick={findSimilar} disabled={loading} size="sm" variant="outline">Similar</Button>
-            </div>
-          }
-        >
-              {/* Job Finder controls */}
-              <section className="rounded-xl border p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-semibold">Find openings</h2>
-                  <div className="flex gap-2">
-                    <Button onClick={fetchJobs} disabled={loading} size="sm" variant="secondary">
-                      {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                      Fetch
-                    </Button>
-                    <Button onClick={findSimilar} disabled={loading} size="sm" variant="outline">
-                      Similar
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 items-end">
-                  <div className="sm:col-span-2">
-                    <Label className="text-xs">Role / Keyword</Label>
-                    <Input value={role} onChange={(e)=> setRole(e.target.value)} placeholder="backend developer" />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <Label className="text-xs">Location</Label>
-                    <Input value={location} onChange={(e)=> setLocation(e.target.value)} placeholder="e.g., Singapore" />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Switch id="remoteOnly" checked={remoteOnly} onCheckedChange={(v)=> setRemoteOnly(Boolean(v))}/>
-                    <Label htmlFor="remoteOnly" className="text-xs">Remote only</Label>
-                  </div>
-                </div>
-              </section>
-
-              {message && (
-                <motion.div {...fadeSlide} className="rounded-lg border bg-muted/40 px-3 py-2 text-sm">
-                  {message}
-                </motion.div>
-              )}
-
-              {/* Target job selector (compact) */}
-              {jobs.length > 0 && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <label className="text-sm font-medium">Target job for C–F</label>
-                
-                  <select
-                className="border rounded-lg px-2 py-1 text-sm"
-                value={selectedJobId ?? jobs[0]?.id}
-                onChange={(e) => {
-                  const id = e.target.value;
-                  setSelectedJobId(id);
-                  // keep 3 most-relevant job ids for potential citations
-                  const top3 = jobs.slice(0, 3).map((j) => j.id);
-                  // ensure selected is included
-                  const citations = Array.from(new Set([id, ...top3])).slice(0, 5);
-                  setCitedJobIds(citations);
-                }}
-              >
-                {jobs.map((j) => (
-                  <option key={j.id} value={j.id}>
-                    {j.title} @ {j.company} — {(j.score * 100).toFixed(1)}%
-                  </option>
-                ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Job results — compact list with pagination */}
-              {!!jobs.length && (
-                <section className="space-y-3">
-                  <div className="grid gap-3">
-                    {pagedJobs.map((job) => <JobRow key={job.id} job={job} />)}
-                  </div>
-
-                  {totalJobPages > 1 && (
-                    <div className="flex items-center justify-between pt-2">
-                      <p className="text-[11px]  text-muted-foreground">
-                        Page {jobsPage} of {totalJobPages}
-                      </p>
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setJobsPage((p) => Math.max(1, p - 1))}
-                          disabled={jobsPage === 1}
-                        >
-                          Prev
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setJobsPage((p) => Math.min(totalJobPages, p + 1))}
-                          disabled={jobsPage === totalJobPages}
-                        >
-                          Next
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </section>
-              )}
-              {!jobs.length && (
-                <EmptyState title="No openings yet" hint="Try Fetch or adjust role/location." />
-              )}
-        </Section>
-
-        <Section title="Decision Duel — Outcome Bands" defaultOpen={Boolean(Object.keys(compareSeries).length)}>
-              {Object.keys(compareSeries).length > 0 && (
-                <section className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-base font-semibold">Decision Duel — outcome bands</h3>
-                    <Button size="sm" variant="outline" onClick={() => onRunG()}>
-                      Recompute
-                    </Button>
-                  </div>
-
-                  {/* Simple comparison table of quick facts */}
-                  <div className="rounded-lg border overflow-hidden">
-
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      {decisionSummaries.map((s) => {
-                        const d = decisions.find(d => d.id === s.decisionId);
-                        return (
-                          <Card key={s.decisionId} className="shadow-sm">
-                            <CardHeader className="py-2">
-                                <CardTitle className="text-sm">{d?.label}</CardTitle>
-                                <div className="text-[11px] text-muted-foreground">
-                                  {s.cohortSize ? `${s.cohortSize} similar` : "cohort unknown"}
-                                  {s.riskNotes ? ` — ${s.riskNotes}` : ""}
-                                </div>
-                              </CardHeader>
-                            <CardContent className="grid grid-cols-2 gap-2 text-sm">
-                              <div className="rounded-lg border p-2">
-                                <div className="text-[11px] text-muted-foreground">First offer (p50)</div>
-                                <div className="font-medium">{s.timeToOfferP50 ? `${s.timeToOfferP50} weeks` : "—"}</div>
-                              </div>
-                              <div className="rounded-lg border p-2">
-                                <div className="text-[11px] text-muted-foreground">1-yr comp</div>
-                                <div className="font-medium">
-                                  {s.comp1yr != null ? `${s.currency ?? ""} ${s.comp1yr.toLocaleString()}` : "—"}
-                                </div>
-                              </div>
-                              <div className="rounded-lg border p-2">
-                                <div className="text-[11px] text-muted-foreground">3-yr ceiling</div>
-                                <div className="font-medium">
-                                  {s.comp3yrCeiling != null ? `${s.currency ?? ""} ${s.comp3yrCeiling.toLocaleString()}` : "—"}
-                                </div>
-                              </div>
-                              <div className="rounded-lg border p-2 flex items-center justify-between">
-                                <div>
-                                  <div className="text-[11px] text-muted-foreground">Well-being</div>
-                                  <RiskBadge score={s.burnoutRisk} />
-                                </div>
-                                {s.burnoutRisk != null && (
-                                  <div className="w-24">
-                                    <Progress value={s.burnoutRisk} />
-                                  </div>
-                                )}
-                              </div>
-                            </CardContent>
-                            {s.explanation && (
-                              <CardFooter className="pt-0">
-                                <p className="text-[11px]  text-muted-foreground">{s.explanation}</p>
-                              </CardFooter>
-                            )}
-                          </Card>
-                        );
-                      })}
-                    </div>
-
-                  </div>
-
-                  {/* Mini band chart for the first selected decision (keep it lightweight) */}
-                  <div className="w-full h-64 rounded-lg border p-3">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={(compareSeries[selectedDecisionIds[0]] ?? []).map(d => ({
-                        week: d.week, p25: d.p25, p50: d.p50, p75: d.p75
-                      }))}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="week" />
-                        <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
-                        <Tooltip formatter={(v:any)=> `${v}%`} labelFormatter={(l)=>`Week ${l}`} />
-                        <Legend />
-                        <ReferenceLine y={targetThreshold} strokeDasharray="4 4" label={`${targetThreshold}% target`} />
-                        <Line type="monotone" dataKey="p25" name="p25" dot />
-                        <Line type="monotone" dataKey="p50" name="p50 (median)" dot />
-                        <Line type="monotone" dataKey="p75" name="p75" dot />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-
-                  <p className="text-[11px]  text-muted-foreground">
-                    Bands show uncertainty from similar profiles. Risk tolerance biases plan selection and the simulator’s assumptions.
-                  </p>
-                </section>
-              )}
-
-              {!Object.keys(compareSeries).length && !simSteps.length && (
-                <EmptyState title="No results yet" hint="Run a simulation to visualize progress." />
-              )}
-
-              {transitions.length > 0 && (
-                <section className="space-y-3">
-                  <h2 className="text-sm font-semibold">Path Explorer</h2>
-
-                  {/* Bridge skills filter */}
-                  <div className="flex flex-wrap gap-2">
-                    {bridgeSkills.map((bs) => {
-                      const on = activeBridge === bs;
-                      return (
-                        <Button
-                          key={bs}
-                          size="sm"
-                          variant={on ? "default" : "outline"}
-                          onClick={() => setActiveBridge(on ? null : bs)}
-                        >
-                          {bs}
-                        </Button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Transitions list with confidence bands + example profiles */}
-                  <div className="rounded-lg border divide-y">
-                    {transitions
-                      .filter((t) => !activeBridge || t.bridgeSkill === activeBridge)
-                      .map((t, idx) => (
-                        <div key={idx} className="p-3 grid grid-cols-5 gap-2 items-center">
-                          <div className="text-sm truncate">{t.fromSkill}</div>
-                          <div className="text-sm text-center">
-                            → <Badge className="mx-1" variant="secondary">{t.bridgeSkill}</Badge> →
-                          </div>
-                          <div className="text-sm truncate">{t.toRole}</div>
-                          <div className="space-y-1">
-                            <div className="text-[11px] text-muted-foreground">Confidence (p25 / p50 / p75)</div>
-                            <div className="flex items-center gap-2">
-                              <Progress value={t.confidence.p50} className="w-32" />
-                              <span className="text-xs">
-                                {t.confidence.p25}% / {t.confidence.p50}% / {t.confidence.p75}%
-                              </span>
-                            </div>
-                          </div>
-                          <div className="flex flex-wrap gap-1 justify-end">
-                            {t.exampleProfileIds.slice(0, 3).map((pid) => (
-                              <Button
-                                key={pid}
-                                size="sm"
-                                variant="ghost"
-                                className="h-7 px-2 text-xs underline"
-                                onClick={() => setShowProfileId(pid)}
-                              >
-                                Profile {pid}
-                              </Button>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-
-                  {/* Example profile modal */}
-                  <Dialog open={!!showProfileId} onOpenChange={(o) => !o && setShowProfileId(null)}>
-                    <DialogContent className="sm:max-w-md">
-                      <DialogHeader>
-                        <DialogTitle>Example profile</DialogTitle>
-                      </DialogHeader>
-                      {showProfileId && (
-                        <div className="space-y-2 text-sm">
-                          <div className="font-medium">
-                            {exampleProfiles[showProfileId]?.title || `Profile ${showProfileId}`}
-                          </div>
-                          <p className="text-muted-foreground whitespace-pre-wrap">
-                            {exampleProfiles[showProfileId]?.summary}
-                          </p>
-                          {exampleProfiles[showProfileId]?.outcome && (
-                            <div className="text-[11px]  text-muted-foreground">
-                              {exampleProfiles[showProfileId]?.outcome?.timeToOfferWeeks
-                                ? `Offer in ~${exampleProfiles[showProfileId]?.outcome?.timeToOfferWeeks} weeks`
-                                : null}
-                              {exampleProfiles[showProfileId]?.outcome?.comp1yr
-                                ? ` • 1-yr comp: ${exampleProfiles[showProfileId]?.outcome?.comp1yr.toLocaleString()}`
-                                : null}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </DialogContent>
-                  </Dialog>
-                  <div className="w-full h-[440px] rounded-lg border overflow-hidden">
-                    <ReactFlow
-                      nodes={rfNodes}
-                      edges={rfEdges}
-                      onNodesChange={onNodesChange}
-                      onEdgesChange={onEdgesChange}
-                      fitView
-                      proOptions={{ hideAttribution: true }}
-                      onEdgeClick={(_, edge: any) => {
-                        const ids = (edge?.data?.exampleProfileIds as string[]) || [];
-                        if (ids[0]) setShowProfileId(ids[0]); // open modal you already wired
-                      }}
-                    >
-                      <MiniMap pannable zoomable />
-                      <Controls showInteractive />
-                      <Background />
-                    </ReactFlow>
-                  </div>
-                  <p className="text-[11px]  text-muted-foreground">
-                    Click an edge to open an example profile for that bridge. Edge labels show median confidence (p50).
-                  </p>
-                </section>
-              )}
-        </Section>
-
-        <Section title="Week-by-Week Plan" defaultOpen={Boolean(weeklyPlan.length)} actions={
-          weeklyPlan.length ? (
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => setCurrentWeek(Math.max(1, currentWeek - 1))}>Prev</Button>
-              <Button size="sm" variant="outline" onClick={() => setCurrentWeek(Math.min(weeklyPlan.length, currentWeek + 1))}>Next</Button>
-              <Button size="sm" onClick={() => autoAdjustPlan(currentWeek)}>Auto-adjust from Week {currentWeek}</Button>
-            </div>
-          ) : null
-        }>
-          {weeklyPlan.length > 0 && (
-            <section className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold">Week-by-Week Plan</h2>
-                <div className="flex gap-2">
-                  <Button size="sm" variant="outline" onClick={() => setCurrentWeek(Math.max(1, currentWeek - 1))}>Prev</Button>
-                  <Button size="sm" variant="outline" onClick={() => setCurrentWeek(Math.min(weeklyPlan.length, currentWeek + 1))}>Next</Button>
-                  <Button size="sm" onClick={() => autoAdjustPlan(currentWeek)}>Auto-adjust from Week {currentWeek}</Button>
-                </div>
-              </div>
-
-              <div className="grid gap-3">
-                {weeklyPlan.map((w) => {
-                  const observed = getObservedHours(w);
-                  const slip = observed < w.plannedHours;
-                  return (
-                    <Card key={w.week} className={w.week === currentWeek ? "ring-2 ring-primary" : ""}>
-                      <CardHeader className="py-3 flex flex-row items-center justify-between">
-                        <div className="space-y-1">
-                          <CardTitle className="text-base">Week {w.week}</CardTitle>
-                          <div className="text-[11px]  text-muted-foreground">
-                            Planned {w.plannedHours}h • Observed {observed}h
-                            {w.carriesOverFrom ? ` • Carry-over from week ${w.carriesOverFrom}` : ""}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {w.checkpoint ? <Badge variant="secondary">Checkpoint</Badge> : null}
-                          {slip ? <Badge variant="destructive">Behind</Badge> : <Badge variant="outline">On track</Badge>}
-                        </div>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        <Progress value={Math.min(100, (observed / Math.max(1, w.plannedHours)) * 100)} />
-                        {w.checkpoint && (
-                          <div className="rounded-lg border p-2 text-xs">
-                            <div className="font-medium">{w.checkpoint.title}</div>
-                            <div className="text-muted-foreground">{w.checkpoint.criteria}</div>
-                          </div>
-                        )}
-                        <div className="space-y-2">
-                          {(w.tasks || []).map((t) => (
-                            <div key={t.id} className="flex items-center justify-between rounded-lg border p-2">
-                              <div className="flex items-center gap-2">
-                                <Checkbox checked={!!t.done} onCheckedChange={() => toggleTask(w.week, t.id)} />
-                                <div>
-                                  <div className="text-sm">{t.title}</div>
-                                  <div className="text-[11px]  text-muted-foreground">
-                                    {t.skill ? `${t.skill} • ` : ""}{t.estHours}h • {t.priority.toUpperCase()}
-                                    {t.url ? <> • <a className="underline" href={t.url} target="_blank" rel="noreferrer">resource</a></> : null}
-                                  </div>
-                                </div>
-                              </div>
-                              {t.done ? <Badge variant="secondary">Done</Badge> : null}
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            </section>
-          )}
-        </Section>
-
-        <Section title="People Like Me — Receipts" defaultOpen={Boolean(similarReceipts.length)} actions={
-          similarReceipts.length ? <Button size="sm" variant="outline" onClick={onRunH}>Refresh</Button> : null
-        }>
-            
-            {similarReceipts.length > 0 && (
-              <section className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-semibold">People Like Me — Receipts</h2>
-                  <Button size="sm" variant="outline" onClick={onRunH}>Refresh</Button>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {similarReceipts.map((p) => (
-                    <Card key={p.profileId} className="shadow-sm">
-                      <CardHeader className="py-2">
-                        <div className="flex items-center justify-between">
-                          <CardTitle className="text-base">Profile {p.profileId.replace(/^.+-/, "").toUpperCase()}</CardTitle>
-                          <Badge variant="secondary">{Math.round(p.similarity * 100)}% match</Badge>
-                        </div>
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {p.pathTaken.map((chip, i) => (
-                            <Badge key={i} variant="outline" className="text-[11px]">{chip}</Badge>
-                          ))}
-                        </div>
-                      </CardHeader>
-                      <CardContent className="space-y-2">
-                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">{p.snippet}</p>
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          <div className="rounded-lg border p-2">
-                            <div className="text-[11px] text-muted-foreground">Offer timing</div>
-                            <div className="font-medium">{p.timeToOffer ? `~${p.timeToOffer} weeks` : "—"}</div>
-                          </div>
-                          <div className="rounded-lg border p-2">
-                            <div className="text-[11px] text-muted-foreground">Comp after 1 yr</div>
-                            <div className="font-medium">
-                              {p.compAfter1yr != null ? `${salaryTarget?.currency ?? ""} ${p.compAfter1yr.toLocaleString()}` : "—"}
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                      {p.sources?.length ? (
-                        <CardFooter className="flex flex-wrap gap-2">
-                          {p.sources.map((s, i) =>
-                            s.url ? (
-                              <a key={i} href={s.url} target="_blank" rel="noreferrer" className="text-xs underline">
-                                {s.label}
-                              </a>
-                            ) : (
-                              <span key={i} className="text-[11px]  text-muted-foreground">{s.label}</span>
-                            )
-                          )}
-                        </CardFooter>
-                      ) : null}
-                    </Card>
-                  ))}
-                </div>
-              </section>
-            )}
-
-        </Section>
-
-        {/* subtle global message */}
-        {message && (
-          <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm">{message}</div>
-        )}
-      </section>
-      <button
-        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-        className="fixed bottom-4 right-4 rounded-full shadow-lg border bg-background px-4 py-2 text-xs"
-      >
-        ↑ Top
-      </button>
-  </DashboardShell>
-</main>
-
-
+      </div>
+    </div>
   );
 }
