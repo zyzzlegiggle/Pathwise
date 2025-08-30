@@ -22,7 +22,6 @@ model User {
 model UserSkill {
   user_id     BigInt
   skill_name  String // main thing thats used
-  proficiency Int? // currently not used so much
   last_updated  DateTime? @db.Date
 
   user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)

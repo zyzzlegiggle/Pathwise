@@ -13,6 +13,7 @@ export async function POST(req: NextRequest) {
     const yearsExperience = body.yearsExperience ?? null;
     const education: string = String(body.education ?? "");
     const skills: string[] = body.skills ?? [];
+    const userName: string = body.userName ?? ""
 
     if (!resumeText || resumeText.trim().length < 20) {
       return NextResponse.json({ ok: false, error: "Resume must be provided or too short" }, { status: 400 });
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
     await prisma.$transaction(async (tx) => {
       await tx.user.upsert({
         where: { user_id: uid },
-        create: { email: `u${userId}@demo.local` },
+        create: { email: `u${userId}@demo.local`, name: userName },
         update: {},
       });
 

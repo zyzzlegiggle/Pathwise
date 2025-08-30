@@ -22,42 +22,12 @@ import { OnboardingForm } from "@/components/custom-ui/on-boarding-form";
 import { SidebarProfile } from "@/components/custom-ui/sidebar-profile";
 import { PathExplorerData } from "@/types/path-explorer-data";
 import { DecisionDuel } from "@/components/custom-ui/decision-duel";
-import { PathExplorer } from "@/components/custom-ui/path-explorer";
+import { fetchPathExplorerData, PathExplorer } from "@/components/custom-ui/path-explorer";
 import { Tradeoffs } from "@/components/custom-ui/tradeoffs";
 import { Evidence } from "@/components/custom-ui/evidence";
 import { Risks } from "@/components/custom-ui/risks";
 import { WeekPlan } from "@/components/custom-ui/week-plan";
 import { PeopleLikeMe } from "@/components/custom-ui/people-like-me";
-
-export async function fetchPathExplorerData(
-  profile: UserProfile,
-  planMode: string
-): Promise<PathExplorerData> {
-  // simulate latency
-  await new Promise((r) => setTimeout(r, 400));
-
-  const baseTargets =
-    planMode === "Aggressive"
-      ? ["Senior Analyst", "Growth PM", "Data Scientist I"]
-      : planMode === "Safe"
-      ? ["Analyst II", "Ops Specialist", "Project Coordinator"]
-      : ["Associate PM", "Business Analyst", "Ops Analyst"];
-
-  return {
-    targets: baseTargets.map((t, i) => ({ id: `target${i + 1}`, label: t })),
-    bridges: [
-      { id: "bridge1", label: "Bridge: foundational skills" },
-      { id: "bridge2", label: "Bridge: portfolio & practice" },
-    ],
-    edges: [
-      { source: "you", target: "bridge1", confidence: 0.6 },
-      { source: "you", target: "bridge2", confidence: 0.5 },
-      { source: "bridge1", target: "target1", confidence: 0.55 },
-      { source: "bridge2", target: "target2", confidence: 0.5 },
-      { source: "bridge2", target: "target3", confidence: 0.45 },
-    ],
-  };
-}
 
 
 // --- Main App ---
@@ -119,23 +89,12 @@ export default function CareerAgentUI() {
 
           <div className="space-y-6 lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto pr-1">
             {/* Path Explorer */}
-            <Section title="Path Explorer" icon={<Layers className="h-5 w-5" />} actions={
-                <div className="flex items-center gap-3 text-sm text-gray-500">
-                  <span className="hidden sm:inline">Plan mode:</span>
-                  <select
-                    aria-label="Plan mode"
-                    className="rounded-lg border bg-white px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900"
-                    value={risk}
-                    onChange={(e) => setRisk(e.target.value)}
-                  >
-                    <option value="Safe">Safe</option>
-                    <option value="Balanced">Balanced</option>
-                    <option value="Aggressive">Aggressive</option>
-                  </select>
-                  <span className="hidden sm:inline">· Confidence bands shown on arrows</span>
-                </div>
-              }>
-             <PathExplorer planMode={risk} data={pathData ?? undefined} />
+            <Section
+              title="Path Explorer"
+              icon={<Layers className="h-5 w-5" />}
+              actions={null}   // ← or keep your select if you like it
+            >
+              <PathExplorer data={pathData ?? undefined} />
             </Section>
 
             {/* Decision Duel */}

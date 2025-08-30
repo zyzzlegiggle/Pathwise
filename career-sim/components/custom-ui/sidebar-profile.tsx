@@ -10,6 +10,7 @@ export function SidebarProfile({ profile }: { profile: UserProfile }) {
     <aside className="sticky top-5 space-y-4">
       <Section title="Your profile" icon={<Info className="h-5 w-5" />}>
         <div className="space-y-3 text-sm">
+          <div className="font-medium">{profile.userName}</div>
           <div><span className="font-medium">Experience:</span> {profile.yearsExp} year(s)</div>
           <div><span className="font-medium">Education:</span> {profile.education || "—"}</div>
           <div>

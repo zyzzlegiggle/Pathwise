@@ -17,10 +17,12 @@ export async function POST(req: NextRequest) {
         properties: { 
             skills: { type: Type.ARRAY, items: { type: Type.STRING } },
             yearsExperience: { type: Type.INTEGER },
-            education: { type: Type.STRING }
+            education: { type: Type.STRING },
+            userName: { type: Type.STRING },
+
         },
-        required: ["skills", "yearsExperience", "education"],
-        propertyOrdering: ["skills", "yearsExperience", "education"],
+        required: ["skills", "yearsExperience", "education", "userName"],
+        propertyOrdering: ["skills", "yearsExperience", "education", "userName"],
       },
     };
     const llmPrompt = `You are given a text input containing information about a candidate’s background:\n\n${text}`;

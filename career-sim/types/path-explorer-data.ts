@@ -1,5 +1,34 @@
+export type ResourceLite = {
+  id: string;                // stringified resource_id or placeholder id
+  title: string;
+  provider?: string;
+  url?: string;
+  hours?: number | null;
+  cost?: number | null;
+  skills: string[];          // which gaps it addresses
+  kind: "learn" | "project"; // foundational module vs portfolio project
+};
+
+export type PathTarget = {
+  id: string;
+  label: string;
+  missingSkills: string[];   // user-visible gaps for this target
+};
+
+export type PathBridge = {
+  id: string;                // "bridge-foundational" | "bridge-portfolio"
+  label: string;
+  resources: ResourceLite[]; // learning modules / projects
+};
+
+export type PathEdge = { source: string; target: string };
+
 export type PathExplorerData = {
-  targets: { id: string; label: string }[];
-  bridges: { id: string; label: string }[];
-  edges: { source: string; target: string; confidence: number }[]; // 0..1
+  targets: PathTarget[];
+  bridges: PathBridge[];
+  edges: PathEdge[];         // unlabeled, kept simple
+  meta?: {
+    userSkills: string[];
+    topGaps: string[];       // union of frequent gaps across targets
+  };
 };
