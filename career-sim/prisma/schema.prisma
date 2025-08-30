@@ -32,37 +32,6 @@ model UserSkill {
   @@map("user_skills")
 }
 
-
-model Job {
-  job_id      BigInt   @id @default(autoincrement())
-  source      String?
-  external_id String?
-  title       String?
-  company     String?
-  location    String?
-  min_salary  Int?
-  max_salary  Int?
-  currency    String?  @default("USD")
-  post_date   DateTime? @db.Date
-  url         String? @db.Text
-  text        JobText?
-
-  @@unique([source, external_id])
-  @@index([post_date])
-  @@index([title])
-  @@map("jobs")
-}
-
-model JobText {
-  job_id      BigInt @id
-  description String @db.MediumText
-  // embedding  VECTOR (SET RAW SQL)
-
-  job Job @relation(fields: [job_id], references: [job_id], onDelete: Cascade)
-
-  @@map("job_texts")
-}
-
 model Resource {
   resource_id    BigInt   @id @default(autoincrement())
   title          String?
@@ -87,7 +56,6 @@ model SkillNode {
 
   @@map("skill_node")
 }
-
 
 model UserProfile {
   user_id          BigInt   @id
