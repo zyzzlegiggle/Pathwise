@@ -1,97 +1,180 @@
 'use client'
-import { clamp, gaussian } from "@/lib/utils";
-import { Info, LineChart } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Info, LineChart as LineChartIcon } from "lucide-react";
 import { Metric } from "./metric";
-import { Area, AreaChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  LineChart, Line, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis
+} from "recharts";
 
-// Create a simple distribution for time-to-first-offer (in weeks)
-function makeTTFO(mean: number, sd: number) {
-  const data = [] as { week: number; Safe: number; Aggressive: number }[];
-  for (let w = 2; w <= 40; w++) {
-    data.push({ week: w, Safe: gaussian(mean + 2, sd, w), Aggressive: gaussian(mean - 3, sd * 0.8, w) });
-  }
-  return data;
+type PathTarget = { id: string; label: string; missingSkills?: string[] };
+
+type DecisionResponse = {
+  metricsA: { firstOffer: string; comp1y: string; comp3y: string; risk: string; burnout: string };
+  metricsB: { firstOffer: string; comp1y: string; comp3y: string; risk: string; burnout: string };
+  ttfo: { week: number; Safe: number; Aggressive: number }[]; // server still returns Safe/Aggressive
+  evidence?: unknown;
+  echo?: Record<string, unknown>;
+};
+
+const APPROACHES = [
+  "Self-study while employed",
+  "Bootcamp / certificate",
+  "Internal transfer",
+  "New employer job search",
+];
+
+const FALLBACK_TARGETS: PathTarget[] = [
+  { id: "associate-pm", label: "Associate PM", missingSkills: ["Backlog grooming", "PRD writing"] },
+  { id: "business-analyst", label: "Business Analyst", missingSkills: ["SQL", "Dashboards"] },
+  { id: "ops-analyst", label: "Ops Analyst", missingSkills: ["Excel", "Process mapping"] },
+];
+
+
+export async function fetchDecision(body: Record<string, unknown>) {
+  const res = await fetch("/api/decision", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error("Failed to fetch /api/decision");
+  return res.json();
 }
 
-// --- Decision Duel ---
-export function DecisionDuel({ hours, location }: { hours: number; location: string }) {
-  const [choiceA, setChoiceA] = useState("Stay & upskill (self-study)");
-  const [choiceB, setChoiceB] = useState("Pivot via course/bootcamp");
 
-  const ttfoData = useMemo(() => makeTTFO(16 - Math.round(hours / 4), 4), [hours]);
+// convert server density to cumulative % (0..100)
+function toCDF(ttfo: { week: number; Safe: number; Aggressive: number }[]) {
+  const sumA = ttfo.reduce((s, d) => s + d.Safe, 0) || 1;
+  const sumB = ttfo.reduce((s, d) => s + d.Aggressive, 0) || 1;
+  let accA = 0, accB = 0;
+  return ttfo.map(d => {
+    accA += d.Safe;
+    accB += d.Aggressive;
+    return { week: d.week, pathA: Math.min(100, (accA / sumA) * 100), pathB: Math.min(100, (accB / sumB) * 100) };
+  });
+}
 
-  const baseComp = location === "Singapore" ? 82000 : 70000;
+export function DecisionDuel({
+  hours,
+  location,
+  pathTargets,
+}: {
+  hours: number;
+  location: string;
+  pathTargets?: PathTarget[];
+}) {
+  const targets = pathTargets?.length ? pathTargets : FALLBACK_TARGETS;
 
-  const metricsA = {
-    firstOffer: `${clamp(10 - Math.round(hours / 6), 4, 18)} wks`,
-    comp1y: `$${(baseComp * 0.95).toLocaleString()}`,
-    comp3y: `$${Math.round(baseComp * 1.55).toLocaleString()}`,
-    risk: "Medium",
-    burnout: "Low"
-  };
-  const metricsB = {
-    firstOffer: `${clamp(12 - Math.round(hours / 7), 4, 20)} wks`,
-    comp1y: `$${Math.round(baseComp * 1.05).toLocaleString()}`,
-    comp3y: `$${Math.round(baseComp * 1.45).toLocaleString()}`,
-    risk: "Medium-High",
-    burnout: "Medium"
-  };
+  // pick two distinct defaults
+  const [targetA, setTargetA] = useState(targets[0]?.label ?? "Associate PM");
+  const [targetB, setTargetB] = useState(targets[1]?.label ?? "Business Analyst");
+  const [approachA, setApproachA] = useState(APPROACHES[0]);
+  const [approachB, setApproachB] = useState(APPROACHES[1]);
+
+  const [server, setServer] = useState<DecisionResponse | null>(null);
+
+  const missingFor = (label: string) =>
+    targets.find(t => t.label === label)?.missingSkills ?? [];
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const data = await fetchDecision({
+          hours,
+          location,
+          targetRoleA: targetA,
+          targetRoleB: targetB,
+          approachA,
+          approachB,
+          missingSkillsA: missingFor(targetA),
+          missingSkillsB: missingFor(targetB),
+        });
+        if (active) setServer(data);
+      } catch {
+        if (active) setServer(null);
+      }
+    })();
+    return () => { active = false; };
+  }, [hours, location, targetA, targetB, approachA, approachB]);
+
+  const cdf = useMemo(
+    () => toCDF(server?.ttfo ?? []),
+    [server?.ttfo]
+  );
+
+  const mA = server?.metricsA ?? { firstOffer: "—", comp1y: "—", comp3y: "—", risk: "—", burnout: "—" };
+  const mB = server?.metricsB ?? { firstOffer: "—", comp1y: "—", comp3y: "—", risk: "—", burnout: "—" };
 
   return (
     <div className="grid gap-5 lg:grid-cols-3">
-      <div className="space-y-3 rounded-2xl border p-4 dark:border-gray-800">
-        <div className="mb-2 text-sm font-semibold">Pick two choices</div>
-        <label className="text-xs text-gray-500">Choice A</label>
-        <select className="w-full rounded-lg border bg-white p-2 text-sm dark:border-gray-800 dark:bg-gray-900" value={choiceA} onChange={(e) => setChoiceA(e.target.value)}>
-          <option>Stay & upskill (self-study)</option>
-          <option>Stay & upskill (certificate)</option>
-          <option>Internal move (new function)</option>
-          <option>New employer (similar role)</option>
-        </select>
-        <label className="mt-3 text-xs text-gray-500">Choice B</label>
-        <select className="w-full rounded-lg border bg-white p-2 text-sm dark:border-gray-800 dark:bg-gray-900" value={choiceB} onChange={(e) => setChoiceB(e.target.value)}>
-          <option>Pivot via course/bootcamp</option>
-          <option>Graduate studies (part-time)</option>
-          <option>Freelance/contract for exposure</option>
-          <option>Career break → re-entry</option>
-        </select>
-        <div className="mt-4 flex items-center gap-2 text-xs text-gray-500">
-          <Info size={14} />
-          Numbers are sample estimates to show the UI.
+      {/* Left: path pickers with plain language */}
+      <div className="space-y-4 rounded-2xl border p-4 dark:border-gray-800">
+        <div className="text-sm font-semibold">Choose two paths to compare</div>
+
+        <div className="grid grid-cols-1 gap-3">
+          <div>
+            <div className="text-xs font-medium mb-1">Path A — Target role</div>
+            <select className="w-full rounded-lg border bg-white p-2 text-sm dark:border-gray-800 dark:bg-gray-900"
+              value={targetA} onChange={(e) => setTargetA(e.target.value)}>
+              {targets.map(t => <option key={t.id}>{t.label}</option>)}
+            </select>
+            <div className="mt-2 text-xs font-medium mb-1">Approach</div>
+            <select className="w-full rounded-lg border bg-white p-2 text-sm dark:border-gray-800 dark:bg-gray-900"
+              value={approachA} onChange={(e) => setApproachA(e.target.value)}>
+              {APPROACHES.map(a => <option key={a}>{a}</option>)}
+            </select>
+          </div>
+
+          <div className="border-t pt-3 dark:border-gray-800" />
+
+          <div>
+            <div className="text-xs font-medium mb-1">Path B — Target role</div>
+            <select className="w-full rounded-lg border bg-white p-2 text-sm dark:border-gray-800 dark:bg-gray-900"
+              value={targetB} onChange={(e) => setTargetB(e.target.value)}>
+              {targets.map(t => <option key={t.id}>{t.label}</option>)}
+            </select>
+            <div className="mt-2 text-xs font-medium mb-1">Approach</div>
+            <select className="w-full rounded-lg border bg-white p-2 text-sm dark:border-gray-800 dark:bg-gray-900"
+              value={approachB} onChange={(e) => setApproachB(e.target.value)}>
+              {APPROACHES.map(a => <option key={a}>{a}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div className="mt-2 flex items-start gap-2 text-xs text-gray-500">
+          <Info size={14} className="mt-0.5" />
+          We estimate how long it may take to get your first offer and what you could earn in year-1 if you land the chosen role in {location}.
         </div>
       </div>
 
+      {/* Right: metrics + clearer chart */}
       <div className="space-y-3 lg:col-span-2">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <Metric label="First offer date" value={metricsA.firstOffer + " / " + metricsB.firstOffer} hint={"A / B (weeks)"} />
-          <Metric label="1‑yr total pay" value={metricsA.comp1y + " / " + metricsB.comp1y} />
-          <Metric label="3‑yr ceiling" value={metricsA.comp3y + " / " + metricsB.comp3y} />
-          <Metric label="Burnout risk" value={metricsA.burnout + " / " + metricsB.burnout} />
+          <Metric label="Offer timeline (weeks)" value={`${mA.firstOffer} / ${mB.firstOffer}`} hint="A / B" />
+          <Metric label={`Year-1 pay (${targetA} / ${targetB})`} value={`${mA.comp1y} / ${mB.comp1y}`} />
+          <Metric label="3-yr pay potential" value={`${mA.comp3y} / ${mB.comp3y}`} />
+          <Metric label="Burnout risk" value={`${mA.burnout} / ${mB.burnout}`} />
         </div>
+
         <div className="rounded-2xl border p-3 dark:border-gray-800">
-          <div className="mb-2 flex items-center gap-2 text-sm font-semibold"><LineChart size={16} />Time‑to‑First‑Offer distribution</div>
+          <div className="mb-1 flex items-center gap-2 text-sm font-semibold">
+            <LineChartIcon size={16} /> Chance of having an offer (by week)
+          </div>
+          <p className="mb-2 text-xs text-gray-500">
+            Higher line earlier = faster. Values show % likelihood you’d have at least one offer by that week.
+          </p>
           <div className="h-56 w-full">
             <ResponsiveContainer>
-              <AreaChart data={ttfoData} margin={{ left: 10, right: 10, top: 10, bottom: 10 }}>
-                <defs>
-                  <linearGradient id="gA" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopOpacity={0.4} />
-                    <stop offset="95%" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="gB" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopOpacity={0.3} />
-                    <stop offset="95%" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
+              <LineChart data={cdf} margin={{ left: 10, right: 10, top: 10, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="week" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip />
+                <XAxis dataKey="week" tick={{ fontSize: 12 }} label={{ value: "Week", position: "insideBottom", offset: -5 }} />
+                <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} tickFormatter={(v) => `${Math.round(v)}%`} />
+                <Tooltip formatter={(v: number) => `${Math.round(v)}%`} />
                 <Legend />
-                <Area type="monotone" dataKey="Safe" strokeWidth={2} fillOpacity={0.4} fill="url(#gA)" />
-                <Area type="monotone" dataKey="Aggressive" strokeWidth={2} fillOpacity={0.3} fill="url(#gB)" />
-              </AreaChart>
+                <Line type="monotone" dataKey="pathA" name={`Path A (${targetA}, ${approachA})`} strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="pathB" name={`Path B (${targetB}, ${approachB})`} strokeWidth={2} dot={false} />
+              </LineChart>
             </ResponsiveContainer>
           </div>
         </div>

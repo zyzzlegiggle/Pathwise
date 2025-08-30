@@ -3,11 +3,7 @@ import { PrismaClient } from "@prisma/client";
 import { Type } from "@google/genai";
 import { structuredOutput, structuredConfig } from "@/lib/llm";
 import type { PathExplorerData, ResourceLite } from "@/types/path-explorer-data";
-
-const prisma =
-  (global as any).prisma ||
-  new PrismaClient({ log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"] });
-if (process.env.NODE_ENV !== "production") (global as any).prisma = prisma;
+import { prisma } from "@/lib/db";
 
 const slug = (s: string) =>
   s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48) || "target";

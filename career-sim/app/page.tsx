@@ -99,7 +99,13 @@ export default function CareerAgentUI() {
 
             {/* Decision Duel */}
             <Section title="Decision Duel" icon={<GitBranch className="h-5 w-5" />}>
-              <DecisionDuel hours={hours} location={location} />
+              <Section title="Compare two paths" icon={<GitBranch className="h-5 w-5" />}>
+              <DecisionDuel
+                hours={hours}
+                location={location}
+                pathTargets={pathData?.targets}
+              />
+            </Section>
             </Section>
 
             {/* Tradeoffs + Evidence */}
