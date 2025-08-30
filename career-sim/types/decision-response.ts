@@ -8,9 +8,4 @@ type DecisionMetrics = {
   burnout: string;
 };
 
-export type DecisionResponse = {
-  metricsA: DecisionMetrics;
-  metricsB: DecisionMetrics;
-  ttfo: { week: number; Safe: number; Aggressive: number }[];
-  echo?: Record<string, unknown>;
-};
+

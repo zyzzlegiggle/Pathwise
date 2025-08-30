@@ -110,8 +110,9 @@ export default function CareerAgentUI() {
 
             {/* Tradeoffs + Evidence */}
             <div className="grid gap-6 lg:grid-cols-2">
-              <Section title="Explainable trade‑offs" icon={<BarChart3 className="h-5 w-5" />}>
-                <Tradeoffs />
+              <Section title="Explainable trade-offs" icon={<BarChart3 className="h-5 w-5" />}>
+                {/* ⬇️ pass profile + target roles so the API can personalize */}
+                <Tradeoffs profile={profile} pathTargets={pathData?.targets} />
               </Section>
               <Section title="Receipts (evidence)" icon={<ListChecks className="h-5 w-5" />}>
                 <Evidence />

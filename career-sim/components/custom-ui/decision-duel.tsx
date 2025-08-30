@@ -42,6 +42,7 @@ export async function fetchDecision(body: Record<string, unknown>) {
 }
 
 
+
 // convert server density to cumulative % (0..100)
 function toCDF(ttfo: { week: number; Safe: number; Aggressive: number }[]) {
   const sumA = ttfo.reduce((s, d) => s + d.Safe, 0) || 1;
