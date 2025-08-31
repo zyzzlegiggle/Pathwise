@@ -16,6 +16,15 @@ type DecisionResponse = {
   echo?: Record<string, unknown>;
 };
 
+
+export type EvidenceItem = { text: string; weight: number; source?: string; url?: string };
+export type EvidenceBuckets = {
+  comparableOutcomes: EvidenceItem[];
+  alumniStories: EvidenceItem[];
+  marketNotes: EvidenceItem[];
+};
+
+
 const APPROACHES = [
   "Self-study while employed",
   "Bootcamp / certificate",
@@ -59,10 +68,12 @@ export function DecisionDuel({
   hours,
   location,
   pathTargets,
+  onEvidence
 }: {
   hours: number;
   location: string;
   pathTargets?: PathTarget[];
+  onEvidence?: (e: EvidenceBuckets) => void;
 }) {
   const targets = pathTargets?.length ? pathTargets : FALLBACK_TARGETS;
 
@@ -91,14 +102,19 @@ export function DecisionDuel({
           missingSkillsA: missingFor(targetA),
           missingSkillsB: missingFor(targetB),
         });
-        if (active) setServer(data);
+        if (active) {
+          setServer(data);
+          // NEW: bubble evidence up
+          if (data?.evidence) onEvidence?.(data.evidence);
+        }
       } catch {
         if (active) setServer(null);
+        // also clear evidence if fetch fails
+        onEvidence?.({ comparableOutcomes: [], alumniStories: [], marketNotes: [] });
       }
     })();
     return () => { active = false; };
   }, [hours, location, targetA, targetB, approachA, approachB]);
-
   const cdf = useMemo(
     () => toCDF(server?.ttfo ?? []),
     [server?.ttfo]

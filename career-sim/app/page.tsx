@@ -21,7 +21,7 @@ import { UserProfile } from "../types/user-profile";
 import { OnboardingForm } from "@/components/custom-ui/on-boarding-form";
 import { SidebarProfile } from "@/components/custom-ui/sidebar-profile";
 import { PathExplorerData } from "@/types/path-explorer-data";
-import { DecisionDuel } from "@/components/custom-ui/decision-duel";
+import { DecisionDuel, EvidenceBuckets } from "@/components/custom-ui/decision-duel";
 import { fetchPathExplorerData, PathExplorer } from "@/components/custom-ui/path-explorer";
 import { Tradeoffs } from "@/components/custom-ui/tradeoffs";
 import { Evidence } from "@/components/custom-ui/evidence";
@@ -37,6 +37,7 @@ export default function CareerAgentUI() {
   const [location, setLocation] = useState("Singapore");
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [pathData, setPathData] = useState<PathExplorerData | null>(null);
+  const [evidence, setEvidence] = useState<EvidenceBuckets | null>(null);
 
   const basePay = location === "Singapore" ? 82000 : 70000;
 
@@ -100,22 +101,22 @@ export default function CareerAgentUI() {
             {/* Decision Duel */}
             <Section title="Decision Duel" icon={<GitBranch className="h-5 w-5" />}>
               <Section title="Compare two paths" icon={<GitBranch className="h-5 w-5" />}>
-              <DecisionDuel
-                hours={hours}
-                location={location}
-                pathTargets={pathData?.targets}
-              />
-            </Section>
+                <DecisionDuel
+                  hours={hours}
+                  location={location}
+                  pathTargets={pathData?.targets}
+                  onEvidence={setEvidence}           
+                />
+              </Section>
             </Section>
 
             {/* Tradeoffs + Evidence */}
             <div className="grid gap-6 lg:grid-cols-2">
               <Section title="Explainable trade-offs" icon={<BarChart3 className="h-5 w-5" />}>
-                {/* ⬇️ pass profile + target roles so the API can personalize */}
                 <Tradeoffs profile={profile} pathTargets={pathData?.targets} />
               </Section>
               <Section title="Receipts (evidence)" icon={<ListChecks className="h-5 w-5" />}>
-                <Evidence />
+                <Evidence data={evidence ?? undefined} />  {/* ← NEW */}
               </Section>
             </div>
 
