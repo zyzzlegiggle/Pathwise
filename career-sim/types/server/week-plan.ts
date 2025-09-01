@@ -10,6 +10,7 @@ export type WeekItem = {
 };
 
 export type WeekPlanResponse = {
+    role: string;
   weeks: WeekItem[];
   echo?: Record<string, unknown>;
 };

@@ -125,7 +125,6 @@ export default function CareerAgentUI() {
             <Section
               title="Week-by-Week Plan"
               icon={<Calendar className="h-5 w-5" />}
-              actions={<div className="flex items-center gap-2 text-xs"><Clock size={14} /> Target {hours} h/week</div>}
             >
               <WeekPlan hours={hours} profile={profile} pathData={pathData ?? undefined} />
             </Section>

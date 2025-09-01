@@ -46,7 +46,7 @@ function fallbackPlan(hours: number, topGaps: string[], bridges: PathExplorerDat
     };
   });
 
-  return { weeks };
+  return {role: "Associate PM", weeks };
 }
 
 /** Ask LLM to synthesize a personalized 12-week plan (uses Path Explorer + profile). */
@@ -60,6 +60,7 @@ async function llmWeekPlan(input: {
   resume?: string;
   years?: number | null;
   education?: string | null;
+  role : string;
 }): Promise<WeekPlanResponse> {
   const schema: structuredConfig = {
     responseMimeType: "application/json",
@@ -155,7 +156,7 @@ ${(input.resume ?? "").slice(0, 1200)}
     const fb = fallbackPlan(input.hours, input.topGaps, input.bridges).weeks;
     while (weeks.length < 12) weeks.push(fb[weeks.length]);
 
-  return { weeks, echo: { usedLLM: true } };
+  return { role: input.role,weeks, echo: { usedLLM: true } };
 }
 
 export async function POST(req: NextRequest) {
@@ -169,6 +170,7 @@ export async function POST(req: NextRequest) {
     const resume: string | undefined = profile?.resume ?? undefined;
     const years: number | null = profile?.years_experience ?? null;
     const education: string | null = profile?.education ?? null;
+    const preferredRole: string | undefined = body.preferredRole; 
 
     // Path Explorer bits (optional)
     const pathData: PathExplorerData | undefined = body.pathData;
@@ -176,6 +178,18 @@ export async function POST(req: NextRequest) {
     const bridges = pathData?.bridges ?? [];
     const topGaps = pathData?.meta?.topGaps ?? [];
     const userSkills = pathData?.meta?.userSkills ?? [];
+
+    const role =
+      preferredRole
+      ?? targets[0]?.label
+      ?? "Associate PM"; // safe default
+
+    // phases to help the UI collapse
+    const phases = [
+      { label: "Foundation", start: 1, end: 4 },
+      { label: "Build", start: 5, end: 8 },
+      { label: "Launch", start: 9, end: 12 },
+    ];
 
     // Try LLM; if anything goes wrong, fall back
     try {
@@ -189,11 +203,12 @@ export async function POST(req: NextRequest) {
         resume,
         years,
         education,
+        role
       });
-      return NextResponse.json(llm);
+      return NextResponse.json({ phases, ...llm });
     } catch (e) {
       const fb = fallbackPlan(hours, topGaps, bridges);
-      return NextResponse.json({ ...fb, echo: { usedLLM: false, error: "LLM failed" } });
+      return NextResponse.json({ phases, ...fb, echo: { usedLLM: false } });
     }
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? "Unknown error" }, { status: 500 });
