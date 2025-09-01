@@ -18,7 +18,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { UserProfile } from "@/types/user-profile";
+import type { UserProfile } from "@/types/server/user-profile";
 
 type PathTarget = { id: string; label: string; missingSkills?: string[] };
 type TradeoffItem = { factor: string; lift: number; rationale?: string };

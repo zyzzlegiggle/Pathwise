@@ -17,10 +17,9 @@ import React, { useEffect, useMemo, useState } from "react";import {
 import "reactflow/dist/style.css";
 import { Chip } from "@/components/custom-ui/chip";
 import { Section } from "@/components/custom-ui/section";
-import { UserProfile } from "../types/user-profile";
+import { UserProfile } from "../types/server/user-profile";
 import { OnboardingForm } from "@/components/custom-ui/on-boarding-form";
 import { SidebarProfile } from "@/components/custom-ui/sidebar-profile";
-import { PathExplorerData } from "@/types/path-explorer-data";
 import { DecisionDuel, EvidenceBuckets } from "@/components/custom-ui/decision-duel";
 import { fetchPathExplorerData, PathExplorer } from "@/components/custom-ui/path-explorer";
 import { Tradeoffs } from "@/components/custom-ui/tradeoffs";
@@ -28,6 +27,7 @@ import { Evidence } from "@/components/custom-ui/evidence";
 import { Risks } from "@/components/custom-ui/risks";
 import { WeekPlan } from "@/components/custom-ui/week-plan";
 import { PeopleLikeMe } from "@/components/custom-ui/people-like-me";
+import { PathExplorerData } from "@/types/client/path-explorer-data";
 
 
 // --- Main App ---
@@ -122,9 +122,13 @@ export default function CareerAgentUI() {
 
             {/* Week Plan + People Like Me */}
             <div className="grid gap-6 lg:grid-cols-2">
-              <Section title="Week‑by‑Week Plan" icon={<Calendar className="h-5 w-5" />} actions={<div className="flex items-center gap-2 text-xs"><Clock size={14} /> Target {hours} h/week</div>}>
-                <WeekPlan hours={hours} />
-              </Section>
+            <Section
+              title="Week-by-Week Plan"
+              icon={<Calendar className="h-5 w-5" />}
+              actions={<div className="flex items-center gap-2 text-xs"><Clock size={14} /> Target {hours} h/week</div>}
+            >
+              <WeekPlan hours={hours} profile={profile} pathData={pathData ?? undefined} />
+            </Section>
               <Section title="People like me" icon={<Users className="h-5 w-5" />}>
                 <PeopleLikeMe />
               </Section>

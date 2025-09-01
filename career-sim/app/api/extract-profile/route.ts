@@ -1,5 +1,5 @@
 import { structuredConfig, structuredOutput } from "@/lib/llm";
-import { PathExplorerData } from "@/types/path-explorer-data";
+import { PathExplorerData } from "@/types/server/path-explorer-data";
 import { Type } from "@google/genai";
 import { UserProfile } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";

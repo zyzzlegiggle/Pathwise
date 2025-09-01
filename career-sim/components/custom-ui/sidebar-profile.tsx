@@ -1,6 +1,6 @@
 'use client'
 
-import { UserProfile } from "@/types/user-profile";
+import { UserProfile } from "@/types/server/user-profile";
 import { Chip } from "./chip";
 import { Section } from "./section";
 import { Info, ListChecks } from "lucide-react";

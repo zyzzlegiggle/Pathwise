@@ -1,5 +1,5 @@
 'use client'
-import { PathExplorerData } from "@/types/path-explorer-data";
+import { PathExplorerData } from "@/types/server/path-explorer-data";
 import { UserProfile } from "@prisma/client";
 import { useMemo, useState } from "react";
 import ReactFlow, { Background, Controls, MiniMap } from "reactflow";

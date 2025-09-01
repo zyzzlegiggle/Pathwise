@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { Type } from "@google/genai";
 import { structuredOutput, structuredConfig } from "@/lib/llm";
-import type { PathExplorerData, ResourceLite } from "@/types/path-explorer-data";
+import type { PathExplorerData, ResourceLite } from "@/types/server/path-explorer-data";
 import { prisma } from "@/lib/db";
 
 const slug = (s: string) =>
