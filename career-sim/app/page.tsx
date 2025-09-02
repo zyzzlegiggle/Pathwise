@@ -102,8 +102,7 @@ export default function CareerAgentUI() {
         <div className="mt-6 grid gap-6 lg:grid-cols-[320px_1fr]">
           <SidebarProfile profile={profile} />
 
-          <div className="space-y-6 lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto pr-1">
-            {/* Path Explorer */}
+<div className="space-y-6 lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto lg:[scrollbar-gutter:stable] pr-1">            {/* Path Explorer */}
             <Section
               title="Path Explorer"
               icon={<Layers className="h-5 w-5" />}

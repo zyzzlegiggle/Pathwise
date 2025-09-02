@@ -157,8 +157,8 @@ export function Evidence({ data }: { data?: EvidenceBuckets }) {
     );
   }
 
-  return (
-    <div className="space-y-3">
+return (
+   <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1 [scrollbar-gutter:stable]">
       {/* One-column layout; no sticky/duplicate title */}
       <div className="grid gap-3 grid-cols-1">
         <Bucket title="Comparable outcomes" items={data!.comparableOutcomes} />

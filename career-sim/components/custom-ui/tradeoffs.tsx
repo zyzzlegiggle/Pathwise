@@ -143,7 +143,13 @@ export function Tradeoffs({ profile, pathTargets }: Props) {
       ) : items && items.length ? (
         <>
           {/* Compact list (Top 3 by default) */}
-          <ul className="space-y-2">
+          <ul
+            className={`space-y-2 ${
+              showAll && (items?.length ?? 0) > 6
+                ? "max-h-[420px] overflow-y-auto pr-1 [scrollbar-gutter:stable]"
+                : ""
+            }`}
+          >
             {visible.map((it, idx) => {
               const pct = Math.max(0, Math.min(100, Math.round((it.lift ?? 0) * 100)));
               const impact =

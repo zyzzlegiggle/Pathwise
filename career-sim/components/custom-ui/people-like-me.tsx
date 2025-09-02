@@ -17,6 +17,11 @@ export function PeopleLikeMe({
 }) {
   const [items, setItems] = useState<SimilarPerson[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+   const [visibleCount, setVisibleCount] = useState(3);
+
+  useEffect(() => {
+    setVisibleCount(3); // reset when new data arrives
+  }, [items?.length]);
 
   async function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -90,9 +95,13 @@ export function PeopleLikeMe({
       {/* Results */}
       {items && (
         <>
-          <div className="space-y-3">
-            {items.map((p, i) => (
-                <div key={i} className="animate-pulse rounded-xl border p-4 shadow-sm dark:border-gray-800">                <div className="mb-1 text-base font-semibold">{p.name}</div>
+          <div
+            className={`space-y-3 ${
+              (items?.length ?? 0) > 3 ? "max-h-[420px] overflow-y-auto pr-1 [scrollbar-gutter:stable]" : ""
+            }`}
+          >
+            {items.slice(0, visibleCount).map((p, i) => (
+               <div key={i} className="animate-pulse rounded-xl border p-4 shadow-sm dark:border-gray-800">                <div className="mb-1 text-base font-semibold">{p.name}</div>
                 <div className="text-sm text-gray-700 dark:text-gray-300">{p.from} → {p.to}</div>
 
                 {/* NEW: compact stat container */}
@@ -136,6 +145,17 @@ export function PeopleLikeMe({
               </div>
             ))}
           </div>
+
+          {items.length > visibleCount && (
+            <div className="mt-2">
+              <button
+                className="text-xs underline underline-offset-2 opacity-80 hover:opacity-100"
+                onClick={() => setVisibleCount((c) => Math.min(items.length, c + 3))}
+              >
+                Show more ({items.length - visibleCount} left)
+              </button>
+            </div>
+          )}
 
           <p className="mt-2 text-xs text-gray-500">
             Examples are anonymized and simplified. In the real app, each card links to sources and proof.

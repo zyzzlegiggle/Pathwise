@@ -111,7 +111,7 @@ export function DecisionDuel({
   return (
     <div className="grid gap-5 lg:grid-cols-3">
       {/* Left: path pickers with plain language */}
-<div className="space-y-4">
+ <div className="space-y-4 max-h-[420px] overflow-y-auto pr-1 [scrollbar-gutter:stable]">
           <div className="text-sm font-semibold">Choose two paths to compare</div>
 
         <div className="grid grid-cols-1 gap-3">

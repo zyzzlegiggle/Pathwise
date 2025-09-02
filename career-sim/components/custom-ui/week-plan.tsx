@@ -175,10 +175,11 @@ export function WeekPlan({
                   <ChevronDown size={16} className={`transition ${open ? "rotate-180" : ""}`} />
                 </button>
 
-                {open && (
-                  <ul className="divide-y px-3 dark:divide-gray-800">
-                    {items.map((w) => (
-                      <li key={w.week} className="flex items-start gap-3 p-3 text-sm min-w-0">
+               {open && (
+                  <div className="max-h-[520px] overflow-y-auto pr-1 [scrollbar-gutter:stable]">
+                    <ul className="divide-y px-3 dark:divide-gray-800">
+                      {items.map((w) => (
+                        <li key={w.week} className="flex items-start gap-3 p-3 text-sm min-w-0">
                         <div className="mt-0.5 h-6 w-6 shrink-0 border text-center text-xs font-semibold leading-6 dark:border-gray-700">
                           {w.week}
                         </div>
@@ -237,6 +238,7 @@ export function WeekPlan({
                       </li>
                     ))}
                   </ul>
+                  </div>
                 )}
               </section>
             );
