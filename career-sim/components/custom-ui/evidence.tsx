@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { Info, ListChecks, ArrowUpRight, HelpCircle } from 'lucide-react';
-import type { EvidenceBuckets, EvidenceItem } from './decision-duel';
+import { EvidenceBuckets, EvidenceItem } from '@/types/client/evidence-types';
 
 type Confidence = 'Strong' | 'Moderate' | 'Preliminary';
 
@@ -140,13 +140,8 @@ export function Evidence({ data }: { data?: EvidenceBuckets }) {
       { k: 'Alumni stories', v: 'Typical pivot timelines' },
       { k: 'Program outcomes', v: 'Portfolio impact on interviews' },
     ];
-    return (
-      <div className="rounded-2xl border p-4 dark:border-gray-800">
-        <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
-          <ListChecks size={16} />
-          Receipts (why we think this)
-        </div>
-        <ul className="space-y-2 text-sm">
+     return (
+    <ul className="space-y-2 text-sm">
           {items.map((it, i) => (
             <li key={i} className="flex items-start gap-2">
               <Info size={16} className="mt-0.5 shrink-0 opacity-70" />
@@ -159,27 +154,17 @@ export function Evidence({ data }: { data?: EvidenceBuckets }) {
             </li>
           ))}
         </ul>
-      </div>
     );
   }
 
   return (
-    <div className="space-y-3 rounded-2xl border p-4 dark:border-gray-800">
-      <div className="mb-1 flex items-center gap-2 text-sm font-semibold">
-        <ListChecks size={16} />
-        Receipts (why we think this)
-        <span className="ml-1 inline-flex items-center gap-1 text-xs opacity-70">
-          <HelpCircle size={14} />
-          Confidence = how reliable this source is for your situation.
-        </span>
-      </div>
-
-      <div className="grid gap-3 md:grid-cols-2">
+    <div className="space-y-3">
+      {/* One-column layout; no sticky/duplicate title */}
+      <div className="grid gap-3 grid-cols-1">
         <Bucket title="Comparable outcomes" items={data!.comparableOutcomes} />
         <Bucket title="Alumni stories" items={data!.alumniStories} />
+        <Bucket title="Market notes" items={data!.marketNotes} />
       </div>
-
-      <Bucket title="Market notes" items={data!.marketNotes} />
     </div>
   );
 }

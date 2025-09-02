@@ -5,24 +5,9 @@ import { Metric } from "./metric";
 import {
   LineChart, Line, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis
 } from "recharts";
-
-type PathTarget = { id: string; label: string; missingSkills?: string[] };
-
-type DecisionResponse = {
-  metricsA: { firstOffer: string; comp1y: string; comp3y: string; risk: string; burnout: string };
-  metricsB: { firstOffer: string; comp1y: string; comp3y: string; risk: string; burnout: string };
-  ttfo: { week: number; Safe: number; Aggressive: number }[]; // server still returns Safe/Aggressive
-  evidence?: unknown;
-  echo?: Record<string, unknown>;
-};
-
-
-export type EvidenceItem = { text: string; weight: number; source?: string; url?: string };
-export type EvidenceBuckets = {
-  comparableOutcomes: EvidenceItem[];
-  alumniStories: EvidenceItem[];
-  marketNotes: EvidenceItem[];
-};
+import { PathTarget } from "@/types/client/path-explorer-data";
+import { EvidenceBuckets } from "@/types/client/evidence-types";
+import { DecisionResponse } from "@/types/client/decision-response";
 
 
 const APPROACHES = [
@@ -126,8 +111,8 @@ export function DecisionDuel({
   return (
     <div className="grid gap-5 lg:grid-cols-3">
       {/* Left: path pickers with plain language */}
-      <div className="space-y-4 rounded-2xl border p-4 dark:border-gray-800">
-        <div className="text-sm font-semibold">Choose two paths to compare</div>
+<div className="space-y-4">
+          <div className="text-sm font-semibold">Choose two paths to compare</div>
 
         <div className="grid grid-cols-1 gap-3">
           <div>

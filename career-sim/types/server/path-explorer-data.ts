@@ -32,3 +32,25 @@ export type PathExplorerData = {
     topGaps: string[];       // union of frequent gaps across targets
   };
 };
+
+export type DbUserProfile = {
+  user_id: bigint;
+  resume: string;
+  years_experience: number | null;
+  education: string | null;
+  updated_at: Date;
+};
+
+export type UIUserProfile = {
+  userName: string;
+  resume: string;
+  yearsExp: number;
+  education: string;
+  skills: string[];
+};
+
+export type PathApiProfile = {
+  resume: string;
+  years_experience: number | null;
+  education: string | null;
+};

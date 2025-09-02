@@ -96,33 +96,26 @@ export function Tradeoffs({ profile, pathTargets }: Props) {
   }, [items, showAll]);
 
   return (
-    <div className="rounded-2xl border p-4 dark:border-gray-800">
-      {/* Header row */}
-      <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm font-semibold">
-          <TrendingUp size={16} />
-          Biggest wins for you
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowHelp((s) => !s)}
-            className="inline-flex items-center gap-1 rounded-xl border px-2 py-1 text-xs hover:bg-gray-50 dark:hover:bg-gray-800"
-            aria-expanded={showHelp}
-          >
-            <HelpCircle size={14} />
-            What does “% bump” mean?
-            {showHelp ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          </button>
-          <button
-            onClick={load}
-            className="inline-flex items-center gap-1 rounded-xl border px-2 py-1 text-xs hover:bg-gray-50 dark:hover:bg-gray-800"
-            aria-label="Refresh"
-          >
-            <RefreshCw size={14} />
-            Refresh
-          </button>
-        </div>
-      </div>
+    <div>
+      <div className="mb-2 flex items-center justify-end gap-2">
+    <button
+           onClick={() => setShowHelp((s) => !s)}
+           className="inline-flex items-center gap-1 rounded-xl border px-2 py-1 text-xs hover:bg-gray-50 dark:hover:bg-gray-800"
+           aria-expanded={showHelp}
+         >
+           <HelpCircle size={14} />+          What does “% bump” mean?
+           {showHelp ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+         </button>
+         <button
+           onClick={load}
+           className="inline-flex items-center gap-1 rounded-xl border px-2 py-1 text-xs hover:bg-gray-50 dark:hover:bg-gray-800"
+           aria-label="Refresh"
+         >
+           <RefreshCw size={14} />
+           Refresh
+         </button>
+       </div>
+
 
       {/* Tiny explainer */}
       {showHelp && (

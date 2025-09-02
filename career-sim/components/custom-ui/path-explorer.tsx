@@ -3,49 +3,11 @@ import { PathExplorerData } from "@/types/server/path-explorer-data";
 import { UserProfile } from "@prisma/client";
 import { useMemo, useState } from "react";
 import ReactFlow, { Background, Controls, MiniMap } from "reactflow";
+import { Modal } from "./modal";
+import { DbUserProfile, PathApiProfile, UIUserProfile } from "@/types/client/path-explorer-data";
 
 const nodeBase =
   "rounded-xl border bg-white px-3 py-2 text-sm shadow-sm dark:border-gray-800 dark:bg-gray-900";
-
-// simple modal
-function Modal({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: React.ReactNode }) {
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3">
-      <div className="max-h-[80vh] w-full max-w-2xl overflow-hidden rounded-2xl border bg-white shadow-xl dark:border-gray-800 dark:bg-gray-900">
-        <div className="flex items-center justify-between border-b p-3 dark:border-gray-800">
-          <h3 className="text-sm font-semibold">{title}</h3>
-          <button onClick={onClose} className="rounded-lg border px-2 py-1 text-xs dark:border-gray-800">Close</button>
-        </div>
-        <div className="max-h-[70vh] overflow-auto p-3">{children}</div>
-      </div>
-    </div>
-  );
-}
-
-// Distinct names avoid collisions:
-export type DbUserProfile = {
-  user_id: bigint;
-  resume: string;
-  years_experience: number | null;
-  education: string | null;
-  updated_at: Date;
-};
-
-export type UIUserProfile = {
-  userName: string;
-  resume: string;
-  yearsExp: number;
-  education: string;
-  skills: string[];
-};
-
-// The exact shape your API needs (decouple from UI/DB types):
-type PathApiProfile = {
-  resume: string;
-  years_experience: number | null;
-  education: string | null;
-};
 
 function toPathApiProfile(p: UIUserProfile | DbUserProfile): PathApiProfile {
   if ("years_experience" in p) {
@@ -65,11 +27,10 @@ function toPathApiProfile(p: UIUserProfile | DbUserProfile): PathApiProfile {
 }
 
 export async function fetchPathExplorerData(
-  profile: UIUserProfile | DbUserProfile,
-  planMode: string
+  profile: UIUserProfile | DbUserProfile
 ): Promise<PathExplorerData> {
   try {
-    const payload = { profile: toPathApiProfile(profile), planMode };
+    const payload = { profile: toPathApiProfile(profile) };
 
     const res = await fetch("/api/path", {
       method: "POST",

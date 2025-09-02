@@ -1,3 +1,4 @@
+'use client'
 
 export type DecisionResponse = {
   metricsA: { firstOffer: string; comp1y: string; comp3y: string; risk: string; burnout: string };

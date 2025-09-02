@@ -20,7 +20,6 @@ import { Section } from "@/components/custom-ui/section";
 import { UserProfile } from "../types/server/user-profile";
 import { OnboardingForm } from "@/components/custom-ui/on-boarding-form";
 import { SidebarProfile } from "@/components/custom-ui/sidebar-profile";
-import { DecisionDuel, EvidenceBuckets } from "@/components/custom-ui/decision-duel";
 import { fetchPathExplorerData, PathExplorer } from "@/components/custom-ui/path-explorer";
 import { Tradeoffs } from "@/components/custom-ui/tradeoffs";
 import { Evidence } from "@/components/custom-ui/evidence";
@@ -28,18 +27,33 @@ import { Risks } from "@/components/custom-ui/risks";
 import { WeekPlan } from "@/components/custom-ui/week-plan";
 import { PeopleLikeMe } from "@/components/custom-ui/people-like-me";
 import { PathExplorerData } from "@/types/client/path-explorer-data";
+import { EvidenceBuckets } from "@/types/client/evidence-types";
+import { DecisionDuel } from "@/components/custom-ui/decision-duel";
 
 
 // --- Main App ---
 export default function CareerAgentUI() {
   const [hours, setHours] = useState(10);
-  const [risk, setRisk] = useState("Balanced");
   const [location, setLocation] = useState("Singapore");
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [pathData, setPathData] = useState<PathExplorerData | null>(null);
   const [evidence, setEvidence] = useState<EvidenceBuckets | null>(null);
 
-  const basePay = location === "Singapore" ? 82000 : 70000;
+
+  // get location
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("https://ipapi.co/json/");
+        const data = await res.json();
+        if (data?.country_name) {
+          setLocation(data.country_name); // e.g., "Singapore"
+        }
+      } catch (e) {
+        console.error("Failed to fetch location", e);
+      }
+    })();
+  }, []);
 
   
   // Load PathExplorer data whenever profile is set or plan mode changes
@@ -47,13 +61,13 @@ export default function CareerAgentUI() {
     if (!profile) return;
     let cancelled = false;
     (async () => {
-      const data = await fetchPathExplorerData(profile, risk)
+      const data = await fetchPathExplorerData(profile)
       if (!cancelled) setPathData(data);
     })();
     return () => {
       cancelled = true;
     };
-  }, [profile, risk]);
+  }, [profile]);
 
   if (!profile) {
     return <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white p-5 dark:from-gray-950 dark:to-gray-900">
@@ -100,14 +114,12 @@ export default function CareerAgentUI() {
 
             {/* Decision Duel */}
             <Section title="Decision Duel" icon={<GitBranch className="h-5 w-5" />}>
-              <Section title="Compare two paths" icon={<GitBranch className="h-5 w-5" />}>
-                <DecisionDuel
-                  hours={hours}
-                  location={location}
-                  pathTargets={pathData?.targets}
-                  onEvidence={setEvidence}           
-                />
-              </Section>
+              <DecisionDuel
+                hours={hours}
+                location={location}
+                pathTargets={pathData?.targets}
+                onEvidence={setEvidence}
+              />
             </Section>
 
             {/* Tradeoffs + Evidence */}
@@ -128,31 +140,9 @@ export default function CareerAgentUI() {
             >
               <WeekPlan hours={hours} profile={profile} pathData={pathData ?? undefined} />
             </Section>
-              <Section title="People like me" icon={<Users className="h-5 w-5" />}>
-                <PeopleLikeMe />
-              </Section>
-            </div>
-
-            {/* Footer / Risk cards */}
-            <Section title="Risks & safeguards" icon={<Shield className="h-5 w-5" />}>
-              <Risks />
-              <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                <RefreshCw size={14} />
-                We decay old data, show uncertainty clearly, and let you choose plan style.
-              </div>
+            <Section title="People like me" icon={<Users className="h-5 w-5" />}>
+                <PeopleLikeMe profile={profile} pathTargets={pathData?.targets} />
             </Section>
-
-            {/* CTA */}
-            <div className="rounded-2xl border bg-white p-5 text-center shadow-sm dark:border-gray-800 dark:bg-gray-900">
-              <div className="mx-auto max-w-2xl">
-                <h3 className="text-lg font-semibold">Ready to plug in real data?</h3>
-                <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
-                  Connect your resume, pick sources (job boards, salary surveys), and turn on live estimates.
-                </p>    
-                <button className="mt-3 inline-flex items-center gap-2 rounded-2xl border bg-gray-900 px-4 py-2 text-sm text-white shadow-sm transition hover:opacity-90 dark:bg-white dark:text-gray-900">
-                  <CircleDollarSign size={16} /> Continue to data setup <ArrowRight size={16} />
-                </button>
-              </div>
             </div>
           </div>
         </div>

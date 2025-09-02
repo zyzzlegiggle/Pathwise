@@ -95,7 +95,7 @@ Return JSON per schema only.
 
 // ---- heuristics fallback (simple & transparent)
 function heuristics(location: string, hours: number, role: string, approach: string): DecisionMetrics {
-  const baseComp = location === "Singapore" ? 82000 : 70000;
+  const baseComp =  1000;
 
   // approach speed tweaks (weeks: negative = faster)
   const speedAdj: Record<string, number> = {

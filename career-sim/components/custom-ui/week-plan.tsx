@@ -86,15 +86,9 @@ export function WeekPlan({
 
   return (
     <div className="min-w-0">
-      {/* Header (flat) */}
-      <div className="sticky top-0 z-10 mb-3 border-b bg-white/70 px-3 py-2 backdrop-blur dark:border-gray-800 dark:bg-gray-900/70">
+      <div className="mb-3 px-3">
         <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <span className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold">
-              <Calendar size={16} />
-              <span className="truncate">Week Plan (12w)</span>
-            </span>
-
             <div className="flex items-center gap-2 text-xs">
               <span className="opacity-70">Role:</span>
               <select
@@ -110,7 +104,7 @@ export function WeekPlan({
             </div>
 
             <button
-              className="border px-2 py-1 text-xs dark:border-gray-700"
+             className="border px-2 py-1 text-xs dark:border-gray-700"
               onClick={() => setCompact(v => !v)}
               title="Toggle compact view"
             >
@@ -148,10 +142,6 @@ export function WeekPlan({
               ))}
             </div>
           </div>
-        </div>
-
-        <div className="mt-1 min-w-0 truncate text-xs text-gray-500 dark:text-gray-400">
-          Plan for <span className="font-medium">{data?.role ?? selectedRole}</span> in {location}. Adjust hours anytime; tasks scale to your weekly time.
         </div>
       </div>
 
