@@ -59,6 +59,7 @@ export default function CareerAgentUI() {
   // Load the data for components
   useEffect(() => {
     if (!profile || !location) return;
+    if (profile) return;
     let cancelled = false;
     (async () => {
       const data = await fetchPathExplorerData(profile)

@@ -16,20 +16,6 @@ export async function extractProfileFromText(text: string): Promise<UserProfile>
 
   const data: any = await res.json();
 
-  // ingest user profile
-  const ingestRes = await fetch("/api/ingest/profile", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ 
-      userId: userId,
-      userName: data.userName,
-      resumeText: text,
-      yearsExperience: data.yearsExperience,
-      education: data.education,
-      resumeNotes: data.resumeNotes ?? null,
-     }),
-  });
-
 
 
   const userProfile: UserProfile = {
