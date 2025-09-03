@@ -97,13 +97,13 @@ export function Tradeoffs({ profile, pathTargets }: Props) {
 
   return (
     <div>
-      <div className="mb-2 flex items-center justify-end gap-2">
+      <div className="mb-2 flex items-center justify-start gap-2">
     <button
            onClick={() => setShowHelp((s) => !s)}
            className="inline-flex items-center gap-1 rounded-xl border px-2 py-1 text-xs hover:bg-gray-50 dark:hover:bg-gray-800"
            aria-expanded={showHelp}
          >
-           <HelpCircle size={14} />+          What does “% bump” mean?
+           <HelpCircle size={14} />          What does “% bump” mean?
            {showHelp ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
          </button>
          <button

@@ -53,7 +53,7 @@ export function DecisionDuel({
   hours,
   location,
   pathTargets,
-  onEvidence
+  onEvidence,
 }: {
   hours: number;
   location: string;

@@ -86,64 +86,65 @@ export function WeekPlan({
 
   return (
     <div className="min-w-0">
-      <div className="mb-3 px-3">
-        <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <div className="flex items-center gap-2 text-xs">
-              <span className="opacity-70">Role:</span>
-              <select
-                className="max-w-[60vw] truncate border bg-white px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900"
-                value={selectedRole}
-                onChange={(e) => setSelectedRole(e.target.value)}
-              >
-                {[data?.role, ...targets.map(t => t.label)]
-                  .filter(Boolean)
-                  .filter((v, i, arr) => arr.indexOf(v) === i)
-                  .map(r => <option key={r} className="truncate">{r}</option>)}
-              </select>
-            </div>
-
-            <button
-             className="border px-2 py-1 text-xs dark:border-gray-700"
-              onClick={() => setCompact(v => !v)}
-              title="Toggle compact view"
-            >
-              {compact ? "Compact" : "Full"}
-            </button>
-          </div>
-
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <div className="text-xs opacity-70">Hours/week:</div>
-            <input
-              type="range" min={4} max={20} value={perWeek}
-              onChange={(e) => {
-                const h = clamp(parseInt(e.target.value, 10) || 10, 4, 20);
-                setLocalHours(h); onHoursChange?.(h);
-              }}
-            />
-            <input
-              type="number"
-              className="w-16 shrink-0 border px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900"
-              min={4} max={20} value={perWeek}
-              onChange={(e) => {
-                const h = clamp(parseInt(e.target.value, 10) || 10, 4, 20);
-                setLocalHours(h); onHoursChange?.(h);
-              }}
-            />
-            <div className="flex flex-wrap gap-1">
-              {PRESETS.map(p => (
-                <button
-                  key={p}
-                  className={`border px-2 py-1 text-xs dark:border-gray-700 ${p === perWeek ? "opacity-100" : "opacity-60 hover:opacity-100"}`}
-                  onClick={() => { setLocalHours(p); onHoursChange?.(p); }}
-                >
-                  {p}h
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
+<div className="mb-3 px-3">
+  <div className="flex flex-wrap gap-3 md:items-center md:justify-between">
+    {/* LEFT: Role selector */}
+    <div className="flex min-w-0 flex-wrap items-center gap-2">
+      <div className="flex items-center gap-2 text-xs">
+        <span className="opacity-70">Role:</span>
+        <select
+          className="max-w-[60vw] truncate border bg-white px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900"
+          value={selectedRole}
+          onChange={(e) => setSelectedRole(e.target.value)}
+        >
+          {[data?.role, ...targets.map(t => t.label)]
+            .filter(Boolean)
+            .filter((v, i, arr) => arr.indexOf(v) === i)
+            .map(r => <option key={r} className="truncate">{r}</option>)}
+        </select>
       </div>
+
+      <button
+        className="border px-2 py-1 text-xs dark:border-gray-700"
+        onClick={() => setCompact(v => !v)}
+        title="Toggle compact view"
+      >
+        {compact ? "Compact" : "Full"}
+      </button>
+    </div>
+
+    {/* RIGHT: Hours/week */}
+    <div className="flex items-center gap-2">
+      <div className="text-xs opacity-70">Hours/week:</div>
+
+      <input
+        type="range"
+        min={4}
+        max={20}
+        value={perWeek}
+        className="w-36 md:w-40"
+        onChange={(e) => {
+          const h = clamp(parseInt(e.target.value, 10) || 10, 4, 20);
+          setLocalHours(h); onHoursChange?.(h);
+        }}
+      />
+
+      <input
+        type="number"
+        className="w-16 shrink-0 border px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900"
+        min={4}
+        max={20}
+        value={perWeek}
+        onChange={(e) => {
+          const h = clamp(parseInt(e.target.value, 10) || 10, 4, 20);
+          setLocalHours(h); onHoursChange?.(h);
+        }}
+      />
+    </div>
+  </div>
+</div>
+
+
 
       {/* Loading / error */}
       {data === null && (

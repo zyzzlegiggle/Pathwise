@@ -118,6 +118,7 @@ export default function CareerAgentUI() {
                 location={location}
                 pathTargets={pathData?.targets}
                 onEvidence={setEvidence}
+    
               />
             </Section>
 

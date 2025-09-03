@@ -84,7 +84,6 @@ Resume snippet: ${(input.resume ?? "").slice(0, 1500)}
 
 Output rules
 - firstOffer as "<integer> wks"
-- Currency USD with "$" and thousands separators
 - risk/burnout: Low/Medium/High
 Return JSON per schema only.
 `;
@@ -128,8 +127,8 @@ function heuristics(location: string, hours: number, role: string, approach: str
 
   return {
     firstOffer: `${weeks} wks`,
-    comp1y: `$${y1.toLocaleString()}`,
-    comp3y: `$${y3.toLocaleString()}`,
+    comp1y: `${y1.toLocaleString()}`,
+    comp3y: `${y3.toLocaleString()}`,
     risk,
     burnout,
   };
