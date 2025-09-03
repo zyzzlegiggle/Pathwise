@@ -31,6 +31,18 @@ model UserSkill {
   @@map("user_skills")
 }
 
+model UserProfile {
+  user_id          BigInt   @id
+  resume           String @db.MediumText
+  years_experience Int?     // 0..50
+  education        String?
+  updated_at       DateTime @updatedAt
+  // resume_embedding VECTOR
+
+  user User @relation(fields: [user_id], references: [user_id])
+  @@map("user_profile")
+}
+
 model Resource {
   resource_id    BigInt   @id @default(autoincrement())
   title          String?
@@ -56,15 +68,5 @@ model SkillNode {
   @@map("skill_node")
 }
 
-model UserProfile {
-  user_id          BigInt   @id
-  resume           String @db.MediumText
-  years_experience Int?     // 0..50
-  education        String?
-  updated_at       DateTime @updatedAt
-  // resume_embedding VECTOR
 
-  user User @relation(fields: [user_id], references: [user_id])
-  @@map("user_profile")
-}
 

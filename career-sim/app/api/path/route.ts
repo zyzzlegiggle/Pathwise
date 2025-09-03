@@ -87,7 +87,7 @@ async function skillsFromResumeFallback(resume: string): Promise<string[]> {
       required: ["skills"],
     },
   };
-  const prompt = `Extract up to 25 canonical skills (tools, frameworks, methodologies) from the resume.
+  const prompt = `Extract up to 5 canonical skills (tools, frameworks, methodologies) from the resume.
 Resume:
 ${resume}`;
   try {

@@ -25,8 +25,8 @@ export async function extractProfileFromText(text: string): Promise<UserProfile>
       userName: data.userName,
       resumeText: text,
       yearsExperience: data.yearsExperience,
-      education: data.education
-
+      education: data.education,
+      resumeNotes: data.resumeNotes ?? null,
      }),
   });
 
@@ -37,7 +37,8 @@ export async function extractProfileFromText(text: string): Promise<UserProfile>
     resume: text,
     yearsExp: data.yearsExperience,
     skills: data.skills,
-    education: data.education 
+    education: data.education,
+    resumeNotes: data.resumeNotes ?? undefined,
   }
   
   return userProfile;

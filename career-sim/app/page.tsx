@@ -34,11 +34,11 @@ import { DecisionDuel } from "@/components/custom-ui/decision-duel";
 // --- Main App ---
 export default function CareerAgentUI() {
   const [hours, setHours] = useState(10);
-  const [location, setLocation] = useState("Singapore");
+  const [location, setLocation] = useState("");
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [pathData, setPathData] = useState<PathExplorerData | null>(null);
   const [evidence, setEvidence] = useState<EvidenceBuckets | null>(null);
-
+  
 
   // get location
   useEffect(() => {
@@ -56,9 +56,9 @@ export default function CareerAgentUI() {
   }, []);
 
   
-  // Load PathExplorer data whenever profile is set or plan mode changes
+  // Load the data for components
   useEffect(() => {
-    if (!profile) return;
+    if (!profile || !location) return;
     let cancelled = false;
     (async () => {
       const data = await fetchPathExplorerData(profile)
