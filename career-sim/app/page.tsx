@@ -78,8 +78,8 @@ export default function CareerAgentUI() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white p-5 text-gray-900 dark:from-gray-950 dark:to-gray-900 dark:text-gray-100">
-      <div className="mx-auto max-w-7xl motion-safe:animate-fadeIn">
-        {/* Header */}
+<div className="mx-auto max-w-7xl motion-safe:animate-fadeIn">
+          {/* Header */}
         <header
           role="banner"
           className="rounded-3xl border bg-white/80 p-6 shadow-sm backdrop-blur supports-[backdrop-filter]:backdrop-blur-md dark:border-gray-800 dark:bg-gray-900/70"

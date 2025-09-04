@@ -2,6 +2,7 @@
 import { UserProfile } from "@/types/user-profile";
 import { ArrowRight, Sparkles, RefreshCw } from "lucide-react";
 import React from "react";
+import { createPortal } from "react-dom";
 
 export async function extractProfileFromText(text: string): Promise<UserProfile> {
   try{
@@ -106,11 +107,18 @@ export function OnboardingForm({ onComplete }: { onComplete: (p: UserProfile) =>
         </button>
       </div>
 
-      {showExample && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm motion-safe:animate-fadeIn">
-          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-lg transition-all motion-safe:animate-scaleUp dark:bg-gray-900">
-
-            <h3 className="mb-3 text-lg font-semibold">Example Background</h3>
+      {showExample && createPortal(
+  <div
+    className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm motion-safe:animate-fadeIn"
+    onClick={() => setShowExample(false)}
+    role="dialog"
+    aria-modal="true"
+  >
+    <div
+      className="w-full max-w-lg rounded-xl bg-white p-6 shadow-lg motion-safe:animate-scaleUp dark:bg-gray-900"
+      onClick={(e) => e.stopPropagation()}
+    >
+       <h3 className="mb-3 text-lg font-semibold">Example Background</h3>
             <p className="mb-4 text-sm text-gray-700 dark:text-gray-300">
               I’m Jane Smith, and I recently graduated from the University of Michigan
               with a degree in Business Administration. Over the past 4 years, I’ve worked
@@ -127,18 +135,20 @@ export function OnboardingForm({ onComplete }: { onComplete: (p: UserProfile) =>
             >
               Close
             </button>
-          </div>
-        </div>
-      )}
+    </div>
+  </div>,
+  document.body
+)}
 
-      {isSubmitting && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" aria-live="polite">
-          <div className="flex items-center gap-3 rounded-xl bg-white px-4 py-3 text-sm shadow-lg dark:bg-gray-900">
-            <RefreshCw className="h-4 w-4 animate-spin" />
-            <span>Analyzing&hellip;</span>
-          </div>
-        </div>
-      )}
+      {isSubmitting && createPortal(
+  <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm" aria-live="polite">
+    <div className="flex items-center gap-3 rounded-xl bg-white px-4 py-3 text-sm shadow-lg dark:bg-gray-900">
+      <RefreshCw className="h-4 w-4 animate-spin" />
+      <span>Analyzing&hellip;</span>
+    </div>
+  </div>,
+  document.body
+)}
 
 
       <button
