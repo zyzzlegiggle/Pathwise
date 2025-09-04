@@ -4,22 +4,12 @@ import { structuredConfig, structuredOutput } from "@/lib/llm";
 import { Type } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
 
-type LlmResumeNotes = {
-  summary?: string;
-  strengths?: string[];
-  gaps?: string[];
-  improvements?: string[];
-  topAchievements?: string[];
-  keywords?: string[];
-  suggestedTitles?: string[];
-};
 
 type LlmExtracted = {
   skills: string[];
   yearsExperience: number;
   education: string;
   userName: string;
-  resumeNotes?: LlmResumeNotes;
 };
 
 function toBigIntId(v: unknown): bigint {
@@ -139,26 +129,13 @@ async function llmExtract(text: string): Promise<LlmExtracted> {
         yearsExperience: { type: Type.INTEGER },
         education: { type: Type.STRING },
         userName: { type: Type.STRING },
-        resumeNotes: {
-          type: Type.OBJECT,
-          properties: {
-            summary: { type: Type.STRING },
-            strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
-            gaps: { type: Type.ARRAY, items: { type: Type.STRING } },
-            improvements: { type: Type.ARRAY, items: { type: Type.STRING } },
-            topAchievements: { type: Type.ARRAY, items: { type: Type.STRING } },
-            keywords: { type: Type.ARRAY, items: { type: Type.STRING } },
-            suggestedTitles: { type: Type.ARRAY, items: { type: Type.STRING } },
-          },
-        },
       },
       required: ["skills", "yearsExperience", "education", "userName"], // keep original
       propertyOrdering: [
         "skills",
         "yearsExperience",
         "education",
-        "userName",
-        "resumeNotes",
+        "userName"
       ],
     },
   };

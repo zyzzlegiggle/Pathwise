@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { Info, ListChecks, ArrowUpRight, HelpCircle } from 'lucide-react';
-import { EvidenceBuckets, EvidenceItem } from '@/types/client/evidence-types';
+import { EvidenceBuckets, EvidenceItem } from '@/types/evidence-types';
 
 type Confidence = 'Strong' | 'Moderate' | 'Preliminary';
 

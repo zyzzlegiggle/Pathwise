@@ -1,6 +1,6 @@
 'use client'
 import { UserProfile } from "@/types/user-profile";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight, Sparkles, RefreshCw } from "lucide-react";
 import React from "react";
 
 export async function extractProfileFromText(text: string): Promise<UserProfile> {
@@ -37,6 +37,9 @@ export function OnboardingForm({ onComplete }: { onComplete: (p: UserProfile) =>
   const [resume, setResume] = React.useState("");
   const [showExample, setShowExample] = React.useState(false);
 
+  const [isSubmitting, setIsSubmitting] = React.useState(false); 
+
+
   // Rotating suggestions (array of strings)
   const suggestions = React.useMemo(
     () => [
@@ -60,8 +63,7 @@ export function OnboardingForm({ onComplete }: { onComplete: (p: UserProfile) =>
 
 
   return (
-    <div className="mx-auto max-w-2xl rounded-3xl border bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-      <h2 className="mb-1 text-xl font-semibold">Tell us about your background</h2>
+<div className="mx-auto max-w-2xl rounded-3xl border bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900 animate-fadeIn">      <h2 className="mb-1 text-xl font-semibold">Tell us about your background</h2>
       <p className="mb-4 text-sm text-gray-600 dark:text-gray-300">
         We’ll use this to provide you with the best experiences.
       </p>
@@ -133,19 +135,45 @@ export function OnboardingForm({ onComplete }: { onComplete: (p: UserProfile) =>
         </div>
       )}
 
-
+      {isSubmitting && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="flex items-center gap-3 rounded-xl bg-white px-4 py-3 text-sm shadow-lg dark:bg-gray-900">
+            <RefreshCw className="h-4 w-4 animate-spin" />
+            <span>Analyzing&hellip;</span>
+          </div>
+        </div>
+      )}
 
       <button
         onClick={async () => {
-          const parsed = await extractProfileFromText(resume);
-          onComplete(parsed);
+          try {
+            setIsSubmitting(true);
+            const parsed = await extractProfileFromText(resume);
+            onComplete(parsed);
+          } catch (e) {
+            // noop – could toast if you have one
+            console.error(e);
+          } finally {
+            setIsSubmitting(false);
+          }
         }}
-        className="inline-flex items-center gap-2 rounded-2xl border bg-gray-900 px-4 py-2 text-sm text-white 
-                  transition-all duration-200 hover:scale-105 hover:bg-gray-800
-                  dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 cursor-pointer"
+        disabled={isSubmitting || !resume.trim()}
+        className={`inline-flex items-center gap-2 rounded-2xl border bg-gray-900 px-4 py-2 text-sm text-white 
+                    transition-all duration-200 ${isSubmitting ? 'opacity-70 cursor-not-allowed' : 'hover:scale-105 hover:bg-gray-800'}
+                    dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100`}
+        aria-busy={isSubmitting}
       >
-        Continue to dashboard
-        <ArrowRight size={16} />
+        {isSubmitting ? (
+          <>
+            <RefreshCw className="h-4 w-4 animate-spin" />
+            Submitting&hellip;
+          </>
+        ) : (
+          <>
+            Continue 
+            <ArrowRight size={16} />
+          </>
+        )}
       </button>
     </div>
   );

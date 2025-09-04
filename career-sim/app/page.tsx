@@ -23,7 +23,6 @@ import { SidebarProfile } from "@/components/custom-ui/sidebar-profile";
 import { fetchPathExplorerData, PathExplorer } from "@/components/custom-ui/path-explorer";
 import { Tradeoffs } from "@/components/custom-ui/tradeoffs";
 import { Evidence } from "@/components/custom-ui/evidence";
-import { Risks } from "@/components/custom-ui/risks";
 import { WeekPlan } from "@/components/custom-ui/week-plan";
 import { PeopleLikeMe } from "@/components/custom-ui/people-like-me";
 import { DecisionDuel } from "@/components/custom-ui/decision-duel";
@@ -71,15 +70,15 @@ export default function CareerAgentUI() {
 
   if (!profile) {
     return <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white p-5 dark:from-gray-950 dark:to-gray-900">
-      <OnboardingForm onComplete={(p) => {
-        setProfile(p);
-      }} />
+      <div className="animate-fadeIn">
+       <OnboardingForm onComplete={(p) => { setProfile(p); }} />
+      </div>
     </div>;
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white p-5 text-gray-900 dark:from-gray-950 dark:to-gray-900 dark:text-gray-100">
-      <div className="mx-auto max-w-7xl">
+      <div className="mx-auto max-w-7xl animate-scaleUp">
         {/* Header */}
         <header className="rounded-3xl border bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
           <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
@@ -103,16 +102,16 @@ export default function CareerAgentUI() {
           <SidebarProfile profile={profile} />
 
             <div className="space-y-6 lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto lg:[scrollbar-gutter:stable] pr-1">            {/* Path Explorer */}
-            {/* <Section
+            <Section
               title="Path Explorer"
               icon={<Layers className="h-5 w-5" />}
               actions={null}   // ← or keep your select if you like it
             >
               <PathExplorer data={pathData ?? undefined} />
-            </Section> */}
+            </Section>
 
             {/* Decision Duel */}
-            {/* <Section title="Decision Duel" icon={<GitBranch className="h-5 w-5" />}>
+            <Section title="Decision Duel" icon={<GitBranch className="h-5 w-5" />}>
               <DecisionDuel
                 hours={hours}
                 location={location}
@@ -120,17 +119,17 @@ export default function CareerAgentUI() {
                 onEvidence={setEvidence}
     
               />
-            </Section> */}
+            </Section>
 
             {/* Tradeoffs + Evidence */}
-            {/* <div className="grid gap-6 lg:grid-cols-2">
+            <div className="grid gap-6 lg:grid-cols-2">
               <Section title="Explainable trade-offs" icon={<BarChart3 className="h-5 w-5" />}>
                 <Tradeoffs profile={profile} pathTargets={pathData?.targets} />
               </Section>
               <Section title="Receipts (evidence)" icon={<ListChecks className="h-5 w-5" />}>
                 <Evidence data={evidence ?? undefined} />
               </Section>
-            </div> */}
+            </div>
 
             {/* Week Plan + People Like Me */}
             <div className="grid gap-6 lg:grid-cols-2">

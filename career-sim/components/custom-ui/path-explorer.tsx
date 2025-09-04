@@ -1,15 +1,14 @@
 'use client'
-import { PathExplorerData } from "@/types/path-explorer-data";
+import { DbUserProfile, PathApiProfile, PathExplorerData, UIUserProfile } from "@/types/path-explorer-data";
 import { UserProfile } from "@prisma/client";
 import { useMemo, useState } from "react";
 import ReactFlow, { Background, Controls, MiniMap } from "reactflow";
 import { Modal } from "./modal";
-import { DbUserProfile, PathApiProfile, UIUserProfile } from "@/types/client/path-explorer-data";
 
 const nodeBase =
   "rounded-xl border bg-white px-3 py-2 text-sm shadow-sm dark:border-gray-800 dark:bg-gray-900";
 
-function toPathApiProfile(p: UIUserProfile | DbUserProfile): PathApiProfile {
+function toPathApiProfile(p: UIUserProfile| DbUserProfile): PathApiProfile {
   if ("years_experience" in p) {
     // DB row → API
     return {

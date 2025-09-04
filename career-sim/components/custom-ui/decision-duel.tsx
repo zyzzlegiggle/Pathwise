@@ -5,9 +5,9 @@ import { Metric } from "./metric";
 import {
   LineChart, Line, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis
 } from "recharts";
-import { PathTarget } from "@/types/client/path-explorer-data";
-import { EvidenceBuckets } from "@/types/client/evidence-types";
-import { DecisionResponse } from "@/types/client/decision-response";
+import { PathTarget } from "@/types/path-explorer-data";
+import { EvidenceBuckets } from "@/types/evidence-types";
+import { DecisionResponse } from "@/types/decision-response";
 
 
 const APPROACHES = [
