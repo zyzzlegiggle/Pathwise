@@ -78,9 +78,12 @@ export default function CareerAgentUI() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white p-5 text-gray-900 dark:from-gray-950 dark:to-gray-900 dark:text-gray-100">
-      <div className="mx-auto max-w-7xl animate-scaleUp">
+      <div className="mx-auto max-w-7xl motion-safe:animate-fadeIn">
         {/* Header */}
-        <header className="rounded-3xl border bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+        <header
+          role="banner"
+          className="rounded-3xl border bg-white/80 p-6 shadow-sm backdrop-blur supports-[backdrop-filter]:backdrop-blur-md dark:border-gray-800 dark:bg-gray-900/70"
+        >
           <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
             <div>
               <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
@@ -90,7 +93,9 @@ export default function CareerAgentUI() {
                 Explore realistic paths, compare choices, and get a weekly plan for your career. Clear numbers, simple language, and sources.
               </p>
             </div>
-            <div className="flex items-center gap-2">
+
+            {/* chips: wrap on small screens */}
+            <div className="flex flex-wrap items-center gap-2">
               <Chip><Map className="mr-1 inline h-3 w-3" /> Path Explorer</Chip>
               <Chip><GitBranch className="mr-1 inline h-3 w-3" /> Decision Duel</Chip>
               <Chip><Calendar className="mr-1 inline h-3 w-3" /> Week Plan</Chip>
@@ -98,10 +103,10 @@ export default function CareerAgentUI() {
           </div>
         </header>
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-[320px_1fr]">
+        <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(280px,340px)_1fr]">
           <SidebarProfile profile={profile} />
 
-            <div className="space-y-6 lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto lg:[scrollbar-gutter:stable] pr-1">            {/* Path Explorer */}
+            <div className="space-y-6 lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto lg:[scrollbar-gutter:stable] pr-1 lg:pr-2 lg:pl-1 motion-safe:scroll-smooth">
             <Section
               title="Path Explorer"
               icon={<Layers className="h-5 w-5" />}

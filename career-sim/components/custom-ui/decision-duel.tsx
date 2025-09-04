@@ -110,64 +110,77 @@ export function DecisionDuel({
 
   return (
     <div className="grid gap-5 lg:grid-cols-3">
-      {/* Left: path pickers with plain language */}
- <div className="space-y-4 max-h-[420px] overflow-y-auto pr-1 [scrollbar-gutter:stable]">
-          <div className="text-sm font-semibold">Choose two paths to compare</div>
+  {/* Left column */}
+  <div className="space-y-4 max-h-[420px] overflow-y-auto pr-1 [scrollbar-gutter:stable]">
+    <div className="text-sm font-semibold">Choose two paths to compare</div>
 
-        <div className="grid grid-cols-1 gap-3">
-          <div>
-            <div className="text-xs font-medium mb-1">Path A — Target role</div>
-            <select className="w-full rounded-lg border bg-white p-2 text-sm dark:border-gray-800 dark:bg-gray-900"
-              value={targetA} onChange={(e) => setTargetA(e.target.value)}>
-              {targets.map(t => <option key={t.id}>{t.label}</option>)}
-            </select>
-            <div className="mt-2 text-xs font-medium mb-1">Approach</div>
-            <select className="w-full rounded-lg border bg-white p-2 text-sm dark:border-gray-800 dark:bg-gray-900"
-              value={approachA} onChange={(e) => setApproachA(e.target.value)}>
-              {APPROACHES.map(a => <option key={a}>{a}</option>)}
-            </select>
-          </div>
+    <div className="grid grid-cols-1 gap-3">
+      <div>
+        <div className="mb-1 text-xs font-medium">Path A — Target role</div>
+        <select
+          className="w-full rounded-lg border bg-white p-2 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:focus-visible:ring-gray-700"
+          value={targetA}
+          onChange={(e) => setTargetA(e.target.value)}
+        >
+          {targets.map(t => <option key={t.id} value={t.label}>{t.label}</option>)}
+        </select>
 
-          <div className="border-t pt-3 dark:border-gray-800" />
-
-          <div>
-            <div className="text-xs font-medium mb-1">Path B — Target role</div>
-            <select className="w-full rounded-lg border bg-white p-2 text-sm dark:border-gray-800 dark:bg-gray-900"
-              value={targetB} onChange={(e) => setTargetB(e.target.value)}>
-              {targets.map(t => <option key={t.id}>{t.label}</option>)}
-            </select>
-            <div className="mt-2 text-xs font-medium mb-1">Approach</div>
-            <select className="w-full rounded-lg border bg-white p-2 text-sm dark:border-gray-800 dark:bg-gray-900"
-              value={approachB} onChange={(e) => setApproachB(e.target.value)}>
-              {APPROACHES.map(a => <option key={a}>{a}</option>)}
-            </select>
-          </div>
-        </div>
-
-        <div className="mt-2 flex items-start gap-2 text-xs text-gray-500">
-          <Info size={14} className="mt-0.5" />
-          We estimate how long it may take to get your first offer and what you could earn in year-1 if you land the chosen role in {location}.
-        </div>
+        <div className="mt-2 mb-1 text-xs font-medium">Approach</div>
+        <select
+          className="w-full rounded-lg border bg-white p-2 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:focus-visible:ring-gray-700"
+          value={approachA}
+          onChange={(e) => setApproachA(e.target.value)}
+        >
+          {APPROACHES.map(a => <option key={a}>{a}</option>)}
+        </select>
       </div>
 
-      {/* Right: metrics + clearer chart */}
-      <div className="space-y-3 lg:col-span-2">
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <Metric label="Offer timeline (weeks)" value={`${mA.firstOffer} / ${mB.firstOffer}`} hint="A / B" />
+      <div className="border-t pt-3 dark:border-gray-800" />
+
+      <div>
+        <div className="mb-1 text-xs font-medium">Path B — Target role</div>
+        <select
+          className="w-full rounded-lg border bg-white p-2 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:focus-visible:ring-gray-700"
+          value={targetB}
+          onChange={(e) => setTargetB(e.target.value)}
+        >
+          {targets.map(t => <option key={t.id} value={t.label}>{t.label}</option>)}
+        </select>
+
+        <div className="mt-2 mb-1 text-xs font-medium">Approach</div>
+        <select
+          className="w-full rounded-lg border bg-white p-2 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:focus-visible:ring-gray-700"
+          value={approachB}
+          onChange={(e) => setApproachB(e.target.value)}
+        >
+          {APPROACHES.map(a => <option key={a}>{a}</option>)}
+        </select>
+      </div>
+    </div>
+
+    <div className="mt-2 flex items-start gap-2 text-xs text-gray-500">
+      <Info size={14} className="mt-0.5 shrink-0" />
+      We estimate how long it may take to get your first offer and what you could earn in year-1 if you land the chosen role in {location}.
+    </div>
+  </div>
+
+  {/* Right: metrics + chart */}
+  <div className="space-y-3 lg:col-span-2">
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+ <Metric label="Offer timeline (weeks)" value={`${mA.firstOffer} / ${mB.firstOffer}`} hint="A / B" />
           <Metric label={`Year-1 pay (${targetA} / ${targetB})`} value={`${mA.comp1y} / ${mB.comp1y}`} />
           <Metric label="3-yr pay potential" value={`${mA.comp3y} / ${mB.comp3y}`} />
-          <Metric label="Burnout risk" value={`${mA.burnout} / ${mB.burnout}`} />
-        </div>
+          <Metric label="Burnout risk" value={`${mA.burnout} / ${mB.burnout}`} />    </div>
 
-        <div className="rounded-2xl border p-3 dark:border-gray-800">
-          <div className="mb-1 flex items-center gap-2 text-sm font-semibold">
-            <LineChartIcon size={16} /> Chance of having an offer (by week)
-          </div>
-          <p className="mb-2 text-xs text-gray-500">
-            Higher line earlier = faster. Values show % likelihood you’d have at least one offer by that week.
-          </p>
-          <div className="h-56 w-full">
-            <ResponsiveContainer>
+    <div className="rounded-2xl border p-3 transition hover:shadow-sm dark:border-gray-800">
+      <div className="mb-1 flex items-center gap-2 text-sm font-semibold">
+        <LineChartIcon size={16} /> Chance of having an offer (by week)
+      </div>
+      <p className="mb-2 text-xs text-gray-500">
+        Higher line earlier = faster. Values show % likelihood you’d have at least one offer by that week.
+      </p>
+      <div className="h-56 w-full">
+                    <ResponsiveContainer>
               <LineChart data={cdf} margin={{ left: 10, right: 10, top: 10, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="week" tick={{ fontSize: 12 }} label={{ value: "Week", position: "insideBottom", offset: -5 }} />
@@ -178,9 +191,10 @@ export function DecisionDuel({
                 <Line type="monotone" dataKey="pathB" name={`Path B (${targetB}, ${approachB})`} strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
-          </div>
-        </div>
       </div>
     </div>
+  </div>
+</div>
+
   );
 }

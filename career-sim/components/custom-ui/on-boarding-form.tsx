@@ -63,7 +63,7 @@ export function OnboardingForm({ onComplete }: { onComplete: (p: UserProfile) =>
 
 
   return (
-<div className="mx-auto max-w-2xl rounded-3xl border bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900 animate-fadeIn">      <h2 className="mb-1 text-xl font-semibold">Tell us about your background</h2>
+<div className="mx-auto max-w-2xl rounded-3xl border bg-white/90 p-6 shadow-sm backdrop-blur dark:border-gray-800 dark:bg-gray-900/80 motion-safe:animate-fadeIn">
       <p className="mb-4 text-sm text-gray-600 dark:text-gray-300">
         We’ll use this to provide you with the best experiences.
       </p>
@@ -71,29 +71,26 @@ export function OnboardingForm({ onComplete }: { onComplete: (p: UserProfile) =>
       {/* Rotating suggestion pill */}
       <button
         type="button"
-        className="mb-3 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs text-gray-700 
-                  transition-all duration-200 hover:scale-105 hover:bg-gray-100 
-                  dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800 cursor-pointer"
+        className="mb-3 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs text-gray-700 transition-all duration-200 hover:scale-105 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800 dark:focus-visible:ring-gray-700 cursor-pointer"
         aria-label="Insert suggestion"
         title="Click to insert this suggestion"
       >
         <Sparkles size={14} />
-        <span
-          key={idx} // important for triggering transition
-          className="line-clamp-1 transition-all duration-500 ease-in-out opacity-0  animate-fadeInUp"
-        >
+        <span key={idx} className="line-clamp-1 motion-safe:animate-fadeInUp">
           {suggestions[idx]}
         </span>
       </button>
 
+
       {/* Single textarea */}
       <textarea
-        className="mb-5 w-full rounded-lg border bg-white p-3 text-sm dark:border-gray-800 dark:bg-gray-900"
+        className="mb-5 w-full rounded-lg border bg-white p-3 text-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:focus-visible:ring-gray-700"
         rows={8}
         placeholder="Paste your resume, experience, education, and skills here…"
         value={resume}
         onChange={(e) => setResume(e.target.value)}
       />
+
 
       <div className="mb-4 flex items-center justify-between">
         <span className="text-sm text-gray-500 dark:text-gray-400">
@@ -110,10 +107,9 @@ export function OnboardingForm({ onComplete }: { onComplete: (p: UserProfile) =>
       </div>
 
       {showExample && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 
-                        backdrop-blur-sm animate-fadeIn">
-          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-lg dark:bg-gray-900 
-                          animate-scaleUp">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm motion-safe:animate-fadeIn">
+          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-lg transition-all motion-safe:animate-scaleUp dark:bg-gray-900">
+
             <h3 className="mb-3 text-lg font-semibold">Example Background</h3>
             <p className="mb-4 text-sm text-gray-700 dark:text-gray-300">
               I’m Jane Smith, and I recently graduated from the University of Michigan
@@ -136,13 +132,14 @@ export function OnboardingForm({ onComplete }: { onComplete: (p: UserProfile) =>
       )}
 
       {isSubmitting && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" aria-live="polite">
           <div className="flex items-center gap-3 rounded-xl bg-white px-4 py-3 text-sm shadow-lg dark:bg-gray-900">
             <RefreshCw className="h-4 w-4 animate-spin" />
             <span>Analyzing&hellip;</span>
           </div>
         </div>
       )}
+
 
       <button
         onClick={async () => {
@@ -158,9 +155,7 @@ export function OnboardingForm({ onComplete }: { onComplete: (p: UserProfile) =>
           }
         }}
         disabled={isSubmitting || !resume.trim()}
-        className={`inline-flex items-center gap-2 rounded-2xl border bg-gray-900 px-4 py-2 text-sm text-white 
-                    transition-all duration-200 ${isSubmitting ? 'opacity-70 cursor-not-allowed' : 'hover:scale-105 hover:bg-gray-800'}
-                    dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100`}
+        className={`inline-flex items-center gap-2 rounded-2xl border bg-gray-900 px-4 py-2 text-sm text-white transition-all duration-200 ${isSubmitting ? 'opacity-70 cursor-not-allowed' : 'hover:scale-105 hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300'} dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 dark:focus-visible:ring-gray-700`}
         aria-busy={isSubmitting}
       >
         {isSubmitting ? (

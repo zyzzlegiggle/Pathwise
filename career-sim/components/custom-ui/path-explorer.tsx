@@ -133,9 +133,8 @@ export function PathExplorer({ data }: { planMode?: string; data?: PathExplorerD
   const portfolio = bridges.find(b => b.id === "bridge-portfolio")?.resources ?? [];
 
   return (
-    <div className="rounded-xl border dark:border-gray-800">
-      {/* shorter graph */}
-      <div className="h-[220px] overflow-hidden">
+<div className="rounded-xl border overflow-hidden dark:border-gray-800">      {/* shorter graph */}
+      <div className="h-[220px] md:h-[260px] overflow-hidden">
         <ReactFlow nodes={nodes as any} edges={edges as any} fitView>
           <MiniMap zoomable pannable />
           <Controls />
@@ -147,7 +146,7 @@ export function PathExplorer({ data }: { planMode?: string; data?: PathExplorerD
       <div className="flex flex-wrap items-center gap-2 border-t p-3 text-xs dark:border-gray-800">
         <span className="font-medium">Your top gaps:</span>
         {topGapsLimited.map((s, i) => (
-          <span key={i} className="rounded-full border px-2 py-0.5 dark:border-gray-800">{s}</span>
+          <span key={i} className="rounded-full border px-2 py-0.5 transition hover:-translate-y-[0.5px] dark:border-gray-800">{s}</span>
         ))}
         {moreGapsCount > 0 && (
           <span className="rounded-full border px-2 py-0.5 dark:border-gray-800">+{moreGapsCount} more</span>
@@ -160,8 +159,7 @@ export function PathExplorer({ data }: { planMode?: string; data?: PathExplorerD
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold">Learn foundational skills</h3>
             {foundational.length > 3 && (
-              <button onClick={() => setShowAllFoundational(true)} className="text-xs underline">View all</button>
-            )}
+<button onClick={() => setShowAllFoundational(true)} className="text-xs underline underline-offset-2 transition hover:opacity-80">View all</button>            )}
           </div>
           <ul className="grid grid-cols-1 gap-2">
             {foundational.slice(0, 3).map(r => (

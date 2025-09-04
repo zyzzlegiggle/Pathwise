@@ -85,64 +85,66 @@ export function WeekPlan({
   }, [data?.weeks, phases]);
 
   return (
-    <div className="min-w-0">
-<div className="mb-3 px-3">
-  <div className="flex flex-wrap gap-3 md:items-center md:justify-between">
-    {/* LEFT: Role selector */}
-    <div className="flex min-w-0 flex-wrap items-center gap-2">
-      <div className="flex items-center gap-2 text-xs">
-        <span className="opacity-70">Role:</span>
-        <select
-          className="max-w-[60vw] truncate border bg-white px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900"
-          value={selectedRole}
-          onChange={(e) => setSelectedRole(e.target.value)}
+<div className="min-w-0">
+  {/* sticky control bar */}
+  <div className="mb-3 px-3 sticky top-0 z-10 border-b bg-white/80 backdrop-blur supports-[backdrop-filter]:backdrop-blur-md py-2 dark:border-gray-800 dark:bg-gray-900/70">
+    <div className="flex flex-wrap gap-3 md:items-center md:justify-between">
+      {/* LEFT: Role selector */}
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <label className="flex items-center gap-2 text-xs">
+          <span className="opacity-70">Role:</span>
+          <select
+            className="max-w-[60vw] truncate rounded border bg-white px-2 py-1 text-xs transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:focus-visible:ring-gray-700"
+            value={selectedRole}
+            onChange={(e) => setSelectedRole(e.target.value)}
+          >
+            {[data?.role, ...targets.map(t => t.label)]
+              .filter(Boolean)
+              .filter((v, i, arr) => arr.indexOf(v) === i)
+              .map(r => <option key={r} className="truncate">{r}</option>)}
+          </select>
+        </label>
+
+        <button
+          className="rounded border px-2 py-1 text-xs transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 dark:border-gray-700 dark:hover:bg-gray-800 dark:focus-visible:ring-gray-700"
+          onClick={() => setCompact(v => !v)}
+          title="Toggle compact view"
         >
-          {[data?.role, ...targets.map(t => t.label)]
-            .filter(Boolean)
-            .filter((v, i, arr) => arr.indexOf(v) === i)
-            .map(r => <option key={r} className="truncate">{r}</option>)}
-        </select>
+          {compact ? "Compact" : "Full"}
+        </button>
       </div>
 
-      <button
-        className="border px-2 py-1 text-xs dark:border-gray-700"
-        onClick={() => setCompact(v => !v)}
-        title="Toggle compact view"
-      >
-        {compact ? "Compact" : "Full"}
-      </button>
-    </div>
+      {/* RIGHT: Hours/week */}
+      <div className="flex items-center gap-2">
+        <div className="text-xs opacity-70">Hours/week:</div>
 
-    {/* RIGHT: Hours/week */}
-    <div className="flex items-center gap-2">
-      <div className="text-xs opacity-70">Hours/week:</div>
+        <input
+          type="range"
+          min={4}
+          max={20}
+          value={perWeek}
+          className="w-36 md:w-40 accent-gray-900 dark:accent-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 dark:focus-visible:ring-gray-700"
+          onChange={(e) => {
+            const h = clamp(parseInt(e.target.value, 10) || 10, 4, 20);
+            setLocalHours(h); onHoursChange?.(h);
+          }}
+        />
 
-      <input
-        type="range"
-        min={4}
-        max={20}
-        value={perWeek}
-        className="w-36 md:w-40"
-        onChange={(e) => {
-          const h = clamp(parseInt(e.target.value, 10) || 10, 4, 20);
-          setLocalHours(h); onHoursChange?.(h);
-        }}
-      />
-
-      <input
-        type="number"
-        className="w-16 shrink-0 border px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900"
-        min={4}
-        max={20}
-        value={perWeek}
-        onChange={(e) => {
-          const h = clamp(parseInt(e.target.value, 10) || 10, 4, 20);
-          setLocalHours(h); onHoursChange?.(h);
-        }}
-      />
+        <input
+          type="number"
+          className="w-16 shrink-0 rounded border px-2 py-1 text-xs transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:focus-visible:ring-gray-700"
+          min={4}
+          max={20}
+          value={perWeek}
+          onChange={(e) => {
+            const h = clamp(parseInt(e.target.value, 10) || 10, 4, 20);
+            setLocalHours(h); onHoursChange?.(h);
+          }}
+        />
+      </div>
     </div>
   </div>
-</div>
+
 
 
 

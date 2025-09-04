@@ -84,12 +84,11 @@ export function PeopleLikeMe({
       {items && (
         <>
           <div
-            className={`space-y-3 ${
-              (items?.length ?? 0) > 3 ? 'max-h-[420px] overflow-y-auto pr-1 [scrollbar-gutter:stable]' : ''
-            }`}
+            className={`space-y-3 ${ (items?.length ?? 0) > 3 ? 'max-h-[420px] overflow-y-auto pr-1 [scrollbar-gutter:stable]' : '' }`}
           >
             {items.slice(0, visibleCount).map((p, i) => (
-              <div key={i} className="rounded-xl border p-4 shadow-sm dark:border-gray-800">
+              <div key={i} className="rounded-xl border p-4 shadow-sm transition hover:-translate-y-[1px] hover:shadow-md dark:border-gray-800">
+
                 <div className="mb-1 text-base font-semibold">{p.name}</div>
                 <div className="text-sm text-gray-700 dark:text-gray-300">
                   {p.from} → {p.to}
@@ -125,8 +124,7 @@ export function PeopleLikeMe({
                         href={s.url || '#'}
                         target="_blank"
                         rel="noreferrer"
-                        className="block text-[11px] text-blue-600 underline"
-                      >
+className="block text-[11px] text-blue-600 underline underline-offset-2 hover:opacity-80"                      >
                         {s.label}
                       </a>
                     ))}

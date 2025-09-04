@@ -8,7 +8,7 @@ import { Info, ListChecks } from "lucide-react";
 export function SidebarProfile({ profile }: { profile: UserProfile }) {
 
   return (
-    <aside className="sticky top-5 space-y-4">
+    <aside className="space-y-4 lg:sticky lg:top-5">
       <Section title="Your profile" icon={<Info className="h-5 w-5" />}>
         <div className="space-y-3 text-sm">
           <div className="font-medium">{profile.userName}</div>

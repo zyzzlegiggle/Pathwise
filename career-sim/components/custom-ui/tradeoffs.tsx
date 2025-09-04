@@ -98,19 +98,20 @@ export function Tradeoffs({ profile, pathTargets }: Props) {
   return (
     <div>
       <div className="mb-2 flex items-center justify-start gap-2">
-    <button
-           onClick={() => setShowHelp((s) => !s)}
-           className="inline-flex items-center gap-1 rounded-xl border px-2 py-1 text-xs hover:bg-gray-50 dark:hover:bg-gray-800"
-           aria-expanded={showHelp}
-         >
+        <button
+          onClick={() => setShowHelp((s) => !s)}
+          className="inline-flex items-center gap-1 rounded-xl border px-2 py-1 text-xs transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 dark:hover:bg-gray-800 dark:focus-visible:ring-gray-700"
+          aria-expanded={showHelp}
+        >
+
            <HelpCircle size={14} />          What does “% bump” mean?
            {showHelp ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
          </button>
          <button
-           onClick={load}
-           className="inline-flex items-center gap-1 rounded-xl border px-2 py-1 text-xs hover:bg-gray-50 dark:hover:bg-gray-800"
-           aria-label="Refresh"
-         >
+            onClick={load}
+            className="inline-flex items-center gap-1 rounded-xl border px-2 py-1 text-xs transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 dark:hover:bg-gray-800 dark:focus-visible:ring-gray-700"
+            aria-label="Refresh"
+          >
            <RefreshCw size={14} />
            Refresh
          </button>
@@ -201,9 +202,9 @@ export function Tradeoffs({ profile, pathTargets }: Props) {
           {/* Controls: Show all / Show chart */}
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {items.length > 3 && (
-              <button
+             <button
                 onClick={() => setShowAll((s) => !s)}
-                className="inline-flex items-center gap-1 rounded-xl border px-3 py-1.5 text-xs hover:bg-gray-50 dark:hover:bg-gray-800"
+                className="inline-flex items-center gap-1 rounded-xl border px-3 py-1.5 text-xs transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 dark:hover:bg-gray-800 dark:focus-visible:ring-gray-700"
                 aria-expanded={showAll}
               >
                 {showAll ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -212,9 +213,10 @@ export function Tradeoffs({ profile, pathTargets }: Props) {
             )}
             <button
               onClick={() => setShowChart((s) => !s)}
-              className="inline-flex items-center gap-1 rounded-xl border px-3 py-1.5 text-xs hover:bg-gray-50 dark:hover:bg-gray-800"
+              className="inline-flex items-center gap-1 rounded-xl border px-3 py-1.5 text-xs transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 dark:hover:bg-gray-800 dark:focus-visible:ring-gray-700"
               aria-expanded={showChart}
             >
+
               <BarChart3 size={14} />
               {showChart ? "Hide chart" : "Show chart"}
             </button>
