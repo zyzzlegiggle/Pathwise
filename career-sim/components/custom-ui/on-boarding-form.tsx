@@ -1,5 +1,5 @@
 'use client'
-import { UserProfile } from "@/types/server/user-profile";
+import { UserProfile } from "@/types/user-profile";
 import { ArrowRight, Sparkles } from "lucide-react";
 import React from "react";
 

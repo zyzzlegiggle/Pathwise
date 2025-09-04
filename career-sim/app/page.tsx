@@ -17,7 +17,7 @@ import React, { useEffect, useMemo, useState } from "react";import {
 import "reactflow/dist/style.css";
 import { Chip } from "@/components/custom-ui/chip";
 import { Section } from "@/components/custom-ui/section";
-import { UserProfile } from "../types/server/user-profile";
+import { UserProfile } from "../types/user-profile";
 import { OnboardingForm } from "@/components/custom-ui/on-boarding-form";
 import { SidebarProfile } from "@/components/custom-ui/sidebar-profile";
 import { fetchPathExplorerData, PathExplorer } from "@/components/custom-ui/path-explorer";
@@ -26,9 +26,9 @@ import { Evidence } from "@/components/custom-ui/evidence";
 import { Risks } from "@/components/custom-ui/risks";
 import { WeekPlan } from "@/components/custom-ui/week-plan";
 import { PeopleLikeMe } from "@/components/custom-ui/people-like-me";
-import { PathExplorerData } from "@/types/client/path-explorer-data";
-import { EvidenceBuckets } from "@/types/client/evidence-types";
 import { DecisionDuel } from "@/components/custom-ui/decision-duel";
+import { PathExplorerData } from "@/types/path-explorer-data";
+import { EvidenceBuckets } from "@/types/evidence-types";
 
 
 // --- Main App ---
@@ -61,8 +61,8 @@ export default function CareerAgentUI() {
     if (!profile || !location) return;
     let cancelled = false;
     (async () => {
-      const data = await fetchPathExplorerData(profile)
-      if (!cancelled) setPathData(data);
+      // const data = await fetchPathExplorerData(profile)
+      // if (!cancelled) setPathData(data);
     })();
     return () => {
       cancelled = true;
@@ -103,13 +103,13 @@ export default function CareerAgentUI() {
           <SidebarProfile profile={profile} />
 
             <div className="space-y-6 lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto lg:[scrollbar-gutter:stable] pr-1">            {/* Path Explorer */}
-            <Section
+            {/* <Section
               title="Path Explorer"
               icon={<Layers className="h-5 w-5" />}
               actions={null}   // ← or keep your select if you like it
             >
               <PathExplorer data={pathData ?? undefined} />
-            </Section>
+            </Section> */}
 
             {/* Decision Duel */}
             {/* <Section title="Decision Duel" icon={<GitBranch className="h-5 w-5" />}>
@@ -133,7 +133,7 @@ export default function CareerAgentUI() {
             </div> */}
 
             {/* Week Plan + People Like Me */}
-            {/* <div className="grid gap-6 lg:grid-cols-2">
+            <div className="grid gap-6 lg:grid-cols-2">
             <Section
               title="Week-by-Week Plan"
               icon={<Calendar className="h-5 w-5" />}
@@ -143,7 +143,7 @@ export default function CareerAgentUI() {
             <Section title="People like me" icon={<Users className="h-5 w-5" />}>
                 <PeopleLikeMe profile={profile} pathTargets={pathData?.targets} />
             </Section>
-            </div> */}
+            </div>
           </div>
         </div>
       </div>

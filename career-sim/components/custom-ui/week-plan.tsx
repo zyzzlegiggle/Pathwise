@@ -2,9 +2,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Calendar, ChevronDown, Link as LinkIcon, Sparkles } from "lucide-react";
 import { clamp } from "@/lib/utils";
-import { WeekItem } from "@/types/server/week-plan";
-import { UserProfile } from "@/types/server/user-profile";
-import { PathExplorerData } from "@/types/server/path-explorer-data";
+import { WeekItem } from "@/types/week-plan";
+import { UserProfile } from "@/types/user-profile";
+import { PathExplorerData } from "@/types/path-explorer-data";
 
 type APIResponse = {
   role: string;

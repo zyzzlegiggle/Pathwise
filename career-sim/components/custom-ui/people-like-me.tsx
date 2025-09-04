@@ -1,12 +1,10 @@
-
 'use client'
 
 import { useEffect, useState } from 'react';
 import { Users, Clock, CircleDollarSign, Sparkles } from 'lucide-react';
 import { Chip } from './chip';
 import type { SimilarPerson } from '@/app/api/people-like-me/route';
-import { UserProfile } from '@/types/server/user-profile';
-
+import { UserProfile } from '@/types/user-profile';
 
 export function PeopleLikeMe({
   profile,
@@ -17,63 +15,55 @@ export function PeopleLikeMe({
 }) {
   const [items, setItems] = useState<SimilarPerson[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-   const [visibleCount, setVisibleCount] = useState(3);
+  const [visibleCount, setVisibleCount] = useState(3);
 
+  // Reset the visible count whenever the number of results changes
   useEffect(() => {
-    setVisibleCount(3); // reset when new data arrives
+    setVisibleCount(3);
   }, [items?.length]);
 
-  async function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
-
-    async function fetchJsonWithRetry(
-      input: RequestInfo,
-      init?: RequestInit,
-      { retries = 3, baseDelay = 600 }: { retries?: number; baseDelay?: number } = {}
-    ) {
-      for (let attempt = 0; ; attempt++) {
-        const res = await fetch(input, init);
-        if (res.ok) return res.json();
-
-        // Retry on rate limit / transient errors
-        if (attempt < retries && (res.status === 429 || (res.status >= 500 && res.status < 600))) {
-          const jitter = Math.floor(Math.random() * 200);
-          const delay = baseDelay * Math.pow(2, attempt) + jitter; // 600ms, ~1200ms, ~2400ms...
-          await sleep(delay);
-          continue;
-        }
-        throw new Error(`Request failed (${res.status})`);
-      }
-    }
-
+  // Load data (note: effect is NOT async)
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
+
     (async () => {
       try {
         setError(null);
         setItems(null);
 
-        // Stagger start so other API calls fire first
-        await sleep(1200 + Math.floor(Math.random() * 600)); // 1.2–1.8s
-
-        const data = await fetchJsonWithRetry('/api/people-like-me', {
+        const resp = await fetch('/api/people-like-me', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           cache: 'no-store',
-          body: JSON.stringify({ profile, targets: pathTargets }),
+          body: JSON.stringify({ profile, targets: pathTargets, userId: 1 }),
+          signal: controller.signal,
         });
 
-        if (active) setItems(Array.isArray(data?.people) ? data.people : []);
+        if (!resp.ok) {
+          throw new Error(`Request failed: ${resp.status}`);
+        }
+
+        const res: any = await resp.json();
+        if (active) {
+          setItems(Array.isArray(res?.people) ? (res.people as SimilarPerson[]) : []);
+        }
       } catch (e: any) {
+        // Ignore abort errors; surface real ones
+        if (e?.name === 'AbortError') return;
         if (active) setError(e?.message || 'Failed to load');
       }
     })();
-    return () => { active = false; };
+
+    // Cleanup on dependency change/unmount
+    return () => {
+      active = false;
+      controller.abort();
+    };
   }, [profile, JSON.stringify(pathTargets ?? [])]);
 
-
   return (
-      <div>
-
+    <div>
       {/* Loading state */}
       {!items && !error && (
         <div className="space-y-3">
@@ -88,23 +78,23 @@ export function PeopleLikeMe({
       )}
 
       {/* Error state */}
-      {error && (
-        <p className="text-xs text-red-500">{error}</p>
-      )}
+      {error && <p className="text-xs text-red-500">{error}</p>}
 
       {/* Results */}
       {items && (
         <>
           <div
             className={`space-y-3 ${
-              (items?.length ?? 0) > 3 ? "max-h-[420px] overflow-y-auto pr-1 [scrollbar-gutter:stable]" : ""
+              (items?.length ?? 0) > 3 ? 'max-h-[420px] overflow-y-auto pr-1 [scrollbar-gutter:stable]' : ''
             }`}
           >
             {items.slice(0, visibleCount).map((p, i) => (
-               <div key={i} className="animate-pulse rounded-xl border p-4 shadow-sm dark:border-gray-800">                <div className="mb-1 text-base font-semibold">{p.name}</div>
-                <div className="text-sm text-gray-700 dark:text-gray-300">{p.from} → {p.to}</div>
+              <div key={i} className="rounded-xl border p-4 shadow-sm dark:border-gray-800">
+                <div className="mb-1 text-base font-semibold">{p.name}</div>
+                <div className="text-sm text-gray-700 dark:text-gray-300">
+                  {p.from} → {p.to}
+                </div>
 
-                {/* NEW: compact stat container */}
                 <div className="mt-3 rounded-xl border bg-gray-50/60 p-3 dark:border-gray-800 dark:bg-gray-900/40">
                   <div className="flex flex-wrap gap-2 text-xs">
                     <div className="inline-flex items-center gap-1 rounded-lg border bg-white/70 px-2 py-1 dark:border-gray-700 dark:bg-gray-950/50">
@@ -162,9 +152,6 @@ export function PeopleLikeMe({
           </p>
         </>
       )}
-
     </div>
   );
 }
-
-

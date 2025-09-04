@@ -86,3 +86,25 @@ model JobRole {
   @@map("job_role")
   @@index([slug])
 }
+
+model People {
+  person_id         BigInt   @id @default(autoincrement())
+  name              String   @db.VarChar(64)
+  from_role         String   @db.VarChar(128)
+  to_role           String   @db.VarChar(128)
+  time_to_offer     String?  @db.VarChar(32)   // e.g., "5 months"
+  pay_from          Int?                    // e.g., 52000
+  pay_to            Int?
+  currency          String?  @db.Char(3)     // "USD", "SGD", etc.
+  note              String?  @db.VarChar(255)
+  sources           Json?
+  resume_summary    String?  @db.Text
+
+  // Native MySQL vector; pick a dim that matches your embedding model
+  //resume_embedding  Unsupported("VECTOR(768)")
+
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  @@map("people")
+}

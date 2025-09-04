@@ -2,7 +2,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Type } from "@google/genai";
 import { structuredOutput, structuredConfig } from "@/lib/llm";
-import type { UserProfile } from "@/types/server/user-profile";
+import type { UserProfile } from "@/types/user-profile";
+import { prisma } from "@/lib/db";
 
 
 export type SimilarPerson = {
@@ -18,92 +19,66 @@ export type SimilarPerson = {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({} as any));
-    const profile: UserProfile | undefined = body?.profile;
+    const userId: bigint | number | string | undefined = body?.userId;
     const targets: Array<{ id: string; label: string }> | undefined = body?.targets;
 
-    if (!profile) {
-      return NextResponse.json({ error: "Missing required: profile" }, { status: 400 });
+    if (!userId) {
+      return NextResponse.json({ error: "Missing required: userId" }, { status: 400 });
     }
 
-    // --- LLM schema & prompt ---
-    const config: structuredConfig = {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          people: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                name: { type: Type.STRING },
-                from: { type: Type.STRING },
-                to: { type: Type.STRING },
-                time: { type: Type.STRING },
-                pay: { type: Type.STRING },
-                note: { type: Type.STRING },
-                sources: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      label: { type: Type.STRING },
-                      url: { type: Type.STRING },
-                    },
-                    required: ["label"],
-                  },
-                },
-              },
-              required: ["name", "from", "to", "time", "pay"],
-            },
-          },
-        },
-        required: ["people"],
-        propertyOrdering: ["people"],
-      },
-    };
+    // Build optional role filter
+    const roleHints = (targets ?? []).map(t => t.label).slice(0, 4);
+    const whereClause = roleHints.length
+      ? "WHERE " + roleHints.map(() => "p.to_role LIKE ?").join(" OR ")
+      : "";
+    const whereParams = roleHints.map(h => `%${h}%`);
 
-    const roleHints = (targets ?? []).map((t) => t.label).slice(0, 4);
+    // Choose your distance: L2_DISTANCE or COSINE_DISTANCE
+    const distanceFn = "VEC_COSINE_DISTANCE"; // or "COSINE_DISTANCE" if you store normalized vectors
 
-    const prompt = `You are helping a career app generate brief, anonymized examples of people with *similar backgrounds* who successfully changed roles.
-Return 3–6 concise examples tailored to the candidate. Keep language simple and concrete.
+    // Single raw SQL: subquery pulls the candidate's embedding from user_profile
+    const rows = await prisma.$queryRawUnsafe<any[]>(
+      `
+      SELECT
+        p.name,
+        p.from_role,
+        p.to_role,
+        p.time_to_offer,
+        p.pay_from,
+        p.pay_to,
+        p.currency,
+        p.note,
+        p.sources
+      FROM people p
+      ${whereClause}
+      ORDER BY ${distanceFn}(
+        p.resume_embedding,
+        (SELECT up.resume_embedding FROM user_profile up WHERE up.user_id = ?)
+      ) ASC
+      LIMIT 6
+      `,
+      ...whereParams,
+      BigInt(userId as any)
+    );
 
-Rules:
-- Use very short strings. No fluff.
-- "name" should be a short, realistic first name (or first-name-like pseudonym). Avoid initials. Optionally include age in parentheses if safely inferred, e.g., "Aiden (26)".
-- Prefer role transitions that match the candidate's likely targets: ${roleHints.join(", ") || "(no hints)"}.
-- "pay" should be a compact summary like "$52k → $65k" or "S$4.5k → S$5.8k". If not sure, give a plausible conservative delta.
-- "time" is the time-to-offer (not total career time).
-- "note" should summarize the key tactic used (e.g., "Portfolio + referral"). make it brief sentence.
-- If you reference a public source, include it under "sources" with label + URL; otherwise omit.
+    const people: SimilarPerson[] = (rows ?? []).map((r) => {
+      const format = (n: number, cur: string) =>
+        new Intl.NumberFormat("en", { style: "currency", currency: cur, maximumFractionDigits: 0 }).format(n);
 
-Candidate profile:
-Name: ${profile.userName}
-Years experience: ${profile.yearsExp}
-Education: ${profile.education}
-Skills: ${profile.skills?.join(", ")}`;
+      const currency = r.currency || "USD";
+      const pay =
+        r.pay_from && r.pay_to ? `${format(r.pay_from, currency)} → ${format(r.pay_to, currency)}` : "—";
 
-    const raw = await structuredOutput(prompt, config);
-    const parsed = JSON.parse(raw) as { people?: unknown };
-
-    const people: SimilarPerson[] = Array.isArray(parsed.people)
-      ? (parsed.people as any[])
-          .filter((p) => p && typeof p === "object")
-          .map((p) => ({
-            name: String(p.name ?? "Anon."),
-            from: String(p.from ?? ""),
-            to: String(p.to ?? ""),
-            time: String(p.time ?? "—"),
-            pay: String(p.pay ?? "—"),
-            note: p.note ? String(p.note) : undefined,
-            sources: Array.isArray(p.sources)
-              ? p.sources
-                  .filter((s: any) => s && typeof s === "object" && s.label)
-                  .map((s: any) => ({ label: String(s.label), url: s.url ? String(s.url) : undefined }))
-              : undefined,
-          }))
-          .slice(0, 6)
-      : [];
+      return {
+        name: String(r.name ?? "Anon"),
+        from: String(r.from_role ?? ""),
+        to: String(r.to_role ?? ""),
+        time: String(r.time_to_offer ?? "—"),
+        pay,
+        note: r.note ? String(r.note) : undefined,
+        sources: Array.isArray(r.sources) ? r.sources : undefined,
+      };
+    });
 
     return NextResponse.json({ people });
   } catch (e: any) {
@@ -111,4 +86,3 @@ Skills: ${profile.skills?.join(", ")}`;
     return NextResponse.json({ error: e?.message || "Unknown error" }, { status: 500 });
   }
 }
-

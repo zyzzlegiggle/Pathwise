@@ -3,8 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { Type } from "@google/genai";
 import { structuredOutput, structuredConfig } from "@/lib/llm";
 import { clamp } from "@/lib/utils";
-import { PathExplorerData, PathTarget, ResourceLite } from "@/types/server/path-explorer-data";
-import { WeekItem, WeekPlanResponse } from "@/types/server/week-plan";
+import { PathExplorerData, PathTarget, ResourceLite } from "@/types/path-explorer-data";
+import { WeekItem, WeekPlanResponse } from "@/types/week-plan";
 
 /** Make a simple, reasonable, deterministic fallback plan if LLM/DB are unavailable. */
 function fallbackPlan(hours: number, topGaps: string[], bridges: PathExplorerData["bridges"] | undefined): WeekPlanResponse {

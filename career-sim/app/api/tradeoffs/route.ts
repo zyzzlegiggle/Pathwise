@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 // ⬅️ Adjust these imports to your actual helpers (your example used structuredOutput + Type)
 import { structuredConfig, structuredOutput } from "@/lib/llm";
 import { Type } from "@google/genai";
-import { UserProfile } from "@/types/server/user-profile";
+import { UserProfile } from "@/types/user-profile";
 
 export type PathTarget = {
   id: string;
