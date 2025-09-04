@@ -26,7 +26,7 @@ export function SidebarProfile({ profile }: { profile: UserProfile }) {
         </div>
       </Section>
 
-      <Section title="Resume notes" icon={<ListChecks className="h-5 w-5" />}>
+      {/* <Section title="Resume notes" icon={<ListChecks className="h-5 w-5" />}>
         {!notes ? (
           <p className="text-xs text-gray-600 dark:text-gray-300">No notes yet.</p>
         ) : (
@@ -90,7 +90,7 @@ export function SidebarProfile({ profile }: { profile: UserProfile }) {
             ) : null}
           </div>
         )}
-      </Section>
+      </Section> */}
     </aside>
   );
 }

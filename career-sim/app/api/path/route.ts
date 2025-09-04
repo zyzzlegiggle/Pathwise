@@ -11,6 +11,72 @@ const norm = (s: string) => s.toLowerCase().replace(/[\s/_-]+/g, " ").trim();
 const uniq = <T,>(a: T[]) => Array.from(new Set(a));
 
 
+
+// route.ts (add near your helpers)
+function makeTermsFromText(s: string): string[] {
+  return uniq(
+    norm(s)
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((t) => t.slice(0, 48)),
+  );
+}
+
+// Rank by overlap between query terms (from resume + user skills) and role title/aliases/requiredSkills
+function roleScore(role: {
+  title: string;
+  aliases?: any | null;
+  requiredSkills?: any | null;
+}, termSet: Set<string>) {
+  const parts: string[] = [role.title];
+  if (Array.isArray(role.aliases)) parts.push(role.aliases.join(" "));
+  if (Array.isArray(role.requiredSkills)) parts.push(role.requiredSkills.join(" "));
+  const tokens = new Set(norm(parts.join(" ")).split(/\s+/).filter(Boolean));
+  let hits = 0;
+  for (const t of termSet) if (tokens.has(t)) hits++;
+  return hits;
+}
+
+// Try DB first: vector search (if available), else keyword search.
+// Returns up to `limit` canonical role titles.
+async function dbFutureRoles(
+  userId: bigint,
+  limit = 3,
+): Promise<string[]> {
+  // Step 1: Fetch embedding from user_profile
+  const sqlEmbedding = `
+    SELECT resume_embedding
+    FROM user_profile
+    WHERE user_id = ?
+    LIMIT 1
+  `;
+  // @ts-ignore
+  const rows = await prisma.$queryRawUnsafe(sqlEmbedding, userId) as Array<{
+    resume_embedding: any;
+  }>;
+
+  if (rows.length === 0 || !rows[0].resume_embedding) {
+    return [];
+  }
+
+  // TiDB / MySQL VECTOR column: raw embedding object/array
+  const v = rows[0].resume_embedding;
+
+  // Step 2: Query job_role table by cosine distance
+  const sqlRoles = `
+    SELECT title
+    FROM job_role
+    ORDER BY VEC_COSINE_DISTANCE(embedding, ?) ASC
+    LIMIT ?
+  `;
+  // @ts-ignore
+  const roles = await prisma.$queryRawUnsafe(sqlRoles, v, limit) as Array<{ title: string }>;
+
+  return roles.map(r => r.title);
+}
+
+
+
 async function llmFutureRoles(resume: string): Promise<string[]> {
   const config: structuredConfig = {
     responseMimeType: "application/json",
@@ -200,14 +266,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Provide profile.user_id or profile.resume" }, { status: 400 });
     }
 
-    // 1) future roles
-    const futureRoles = await llmFutureRoles(resume);
+    // 1) user skills (used both for DB role ranking & gaps later)
+    let userSkills: string[] = [];
+    
+    if (uid != null) userSkills = await userSkillsFromDB(uid);
+    if (userSkills.length === 0 && resume) userSkills = await skillsFromResumeFallback(resume);
+
+    // 2) FUTURE ROLES: Prefer DB job_role → fallback to LLM
+    let futureRoles: string[] = []
+    console.log(uid);
+    if (uid !== null) {
+        futureRoles = await dbFutureRoles(uid, 3);
+        console.log(futureRoles);
+      }
     if (futureRoles.length === 0) {
+      futureRoles = await llmFutureRoles(resume);
+    }
+
+    if (futureRoles.length === 0) {
+      // ... keep your minimal fallback payload
       const minimal: PathExplorerData = {
         targets: [
           { id: "associate-pm", label: "Associate PM", missingSkills: ["Backlog grooming", "PRD writing"] },
           { id: "business-analyst", label: "Business Analyst", missingSkills: ["SQL", "Dashboards"] },
-          { id: "ops-analyst", label: "Ops Analyst", missingSkills: ["Excel", "Process mapping"] },
+          { id: "ops-analyst", label: "Ops Analystic", missingSkills: ["Excel", "Process mapping"] },
         ],
         bridges: [
           { id: "bridge-foundational", label: "Learn foundational skills", resources: [] },
@@ -224,12 +306,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(minimal);
     }
 
-    // 2) user skills
-    let userSkills: string[] = [];
-    if (uid != null) userSkills = await userSkillsFromDB(uid);
-    if (userSkills.length === 0 && resume) userSkills = await skillsFromResumeFallback(resume);
-
-    // 3) gaps per target
+    // 3) gaps per target (unchanged)
     const targets: PathExplorerData["targets"] = [];
     const gapCounter = new Map<string, number>();
     for (const role of futureRoles) {
@@ -243,7 +320,7 @@ export async function POST(req: NextRequest) {
       .slice(0, 10)
       .map(([g]) => g);
 
-    // 4) resources for bridges (use union of top gaps)
+    // 4) resources for bridges (unchanged)
     const foundational = await resourcesForGaps(topGaps, "learn", 1);
     const portfolio = await resourcesForGaps(topGaps, "project", 1);
 
@@ -253,7 +330,6 @@ export async function POST(req: NextRequest) {
         { id: "bridge-foundational", label: "Learn foundational skills", resources: foundational },
         { id: "bridge-portfolio", label: "Practice your skills", resources: portfolio },
       ],
-      // clean & readable path, no percentages:
       edges: [
         { source: "you", target: "bridge-foundational" },
         { source: "bridge-foundational", target: "bridge-portfolio" },

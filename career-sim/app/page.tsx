@@ -59,7 +59,6 @@ export default function CareerAgentUI() {
   // Load the data for components
   useEffect(() => {
     if (!profile || !location) return;
-    if (profile) return;
     let cancelled = false;
     (async () => {
       const data = await fetchPathExplorerData(profile)
@@ -103,7 +102,7 @@ export default function CareerAgentUI() {
         <div className="mt-6 grid gap-6 lg:grid-cols-[320px_1fr]">
           <SidebarProfile profile={profile} />
 
-<div className="space-y-6 lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto lg:[scrollbar-gutter:stable] pr-1">            {/* Path Explorer */}
+            <div className="space-y-6 lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto lg:[scrollbar-gutter:stable] pr-1">            {/* Path Explorer */}
             <Section
               title="Path Explorer"
               icon={<Layers className="h-5 w-5" />}
@@ -113,7 +112,7 @@ export default function CareerAgentUI() {
             </Section>
 
             {/* Decision Duel */}
-            <Section title="Decision Duel" icon={<GitBranch className="h-5 w-5" />}>
+            {/* <Section title="Decision Duel" icon={<GitBranch className="h-5 w-5" />}>
               <DecisionDuel
                 hours={hours}
                 location={location}
@@ -121,20 +120,20 @@ export default function CareerAgentUI() {
                 onEvidence={setEvidence}
     
               />
-            </Section>
+            </Section> */}
 
             {/* Tradeoffs + Evidence */}
-            <div className="grid gap-6 lg:grid-cols-2">
+            {/* <div className="grid gap-6 lg:grid-cols-2">
               <Section title="Explainable trade-offs" icon={<BarChart3 className="h-5 w-5" />}>
                 <Tradeoffs profile={profile} pathTargets={pathData?.targets} />
               </Section>
               <Section title="Receipts (evidence)" icon={<ListChecks className="h-5 w-5" />}>
-                <Evidence data={evidence ?? undefined} />  {/* ← NEW */}
+                <Evidence data={evidence ?? undefined} />
               </Section>
-            </div>
+            </div> */}
 
             {/* Week Plan + People Like Me */}
-            <div className="grid gap-6 lg:grid-cols-2">
+            {/* <div className="grid gap-6 lg:grid-cols-2">
             <Section
               title="Week-by-Week Plan"
               icon={<Calendar className="h-5 w-5" />}
@@ -144,7 +143,7 @@ export default function CareerAgentUI() {
             <Section title="People like me" icon={<Users className="h-5 w-5" />}>
                 <PeopleLikeMe profile={profile} pathTargets={pathData?.targets} />
             </Section>
-            </div>
+            </div> */}
           </div>
         </div>
       </div>

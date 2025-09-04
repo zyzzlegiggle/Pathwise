@@ -70,3 +70,19 @@ model SkillNode {
 
 
 
+model JobRole {
+  id              BigInt   @id @default(autoincrement())
+  title           String   @unique
+  slug            String   @unique
+  aliases         Json?                  // e.g. ["SWE", "Software Developer"]
+  description     String?  @db.MediumText
+  requiredSkills  Json?                  // e.g. ["SQL", "React", "Backlog grooming"]
+
+  embedding Unsupported("VECTOR(768)")? // managed via raw SQL migration
+
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@map("job_role")
+  @@index([slug])
+}
