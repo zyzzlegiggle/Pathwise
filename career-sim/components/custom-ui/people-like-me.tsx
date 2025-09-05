@@ -77,6 +77,10 @@ export function PeopleLikeMe({
         </div>
       )}
 
+      {items && items.length === 0 && !error && (
+        <p className="text-xs text-gray-500">No similar people found.</p>
+      )}
+
       {/* Error state */}
       {error && <p className="text-xs text-red-500">{error}</p>}
 
@@ -145,9 +149,6 @@ className="block text-[11px] text-blue-600 underline underline-offset-2 hover:op
             </div>
           )}
 
-          <p className="mt-2 text-xs text-gray-500">
-            Examples are anonymized and simplified. In the real app, each card links to sources and proof.
-          </p>
         </>
       )}
     </div>

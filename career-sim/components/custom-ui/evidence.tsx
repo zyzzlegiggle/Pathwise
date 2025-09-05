@@ -132,28 +132,23 @@ export function Evidence({ data }: { data?: EvidenceBuckets }) {
       data.alumniStories?.length ||
       data.marketNotes?.length);
 
-  if (!hasLive) {
-    // concise placeholder layout
-    const items = [
-      { k: 'Salary survey (region, 2024)', v: 'Median comp by level & function' },
-      { k: 'Job posts (target roles)', v: 'Common requirements & keywords' },
-      { k: 'Alumni stories', v: 'Typical pivot timelines' },
-      { k: 'Program outcomes', v: 'Portfolio impact on interviews' },
-    ];
-     return (
-    <ul className="space-y-2 text-sm">
-          {items.map((it, i) => (
-            <li key={i} className="flex items-start gap-2">
-              <Info size={16} className="mt-0.5 shrink-0 opacity-70" />
-              <div>
-                <div className="font-medium">{it.k}</div>
-                <div className="text-xs text-gray-500">
-                  {it.v} · With links and cohort sizes in the full product.
-                </div>
-              </div>
-            </li>
-          ))}
-        </ul>
+ if (!hasLive) {
+    return (
+      <div className="space-y-3">
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            className="rounded-xl border p-3 dark:border-gray-800 animate-pulse"
+          >
+            <div className="mb-2 h-3 w-40 rounded bg-gray-200 dark:bg-gray-800" />
+            <div className="space-y-2">
+              <div className="h-4 rounded bg-gray-200 dark:bg-gray-800" />
+              <div className="h-4 w-5/6 rounded bg-gray-200 dark:bg-gray-800" />
+              <div className="h-4 w-3/4 rounded bg-gray-200 dark:bg-gray-800" />
+            </div>
+          </div>
+        ))}
+      </div>
     );
   }
 

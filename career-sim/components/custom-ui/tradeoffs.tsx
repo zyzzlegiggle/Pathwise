@@ -95,6 +95,8 @@ export function Tradeoffs({ profile, pathTargets }: Props) {
     return showAll ? arr : arr.slice(0, 3);
   }, [items, showAll]);
 
+  const truncate = (s: string) => (s.length > 24 ? s.slice(0, 24) + "…" : s);
+
   return (
     <div>
       <div className="mb-2 flex items-center justify-start gap-2">
@@ -104,7 +106,8 @@ export function Tradeoffs({ profile, pathTargets }: Props) {
           aria-expanded={showHelp}
         >
 
-           <HelpCircle size={14} />          What does “% bump” mean?
+           <HelpCircle size={14} /> What does the % mean?
+{showHelp ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
            {showHelp ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
          </button>
          <button
@@ -119,16 +122,17 @@ export function Tradeoffs({ profile, pathTargets }: Props) {
 
 
       {/* Tiny explainer */}
-      {showHelp && (
-        <div className="mb-3 rounded-lg bg-gray-50 p-3 text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-200">
-          <div className="font-semibold">“Estimated bump” in interview chances</div>
-          If an average application gives you a ~10% chance of an interview, a
-          <span className="mx-1 rounded-md bg-gray-200 px-1 py-0.5 text-[11px] font-semibold text-gray-800 dark:bg-gray-700 dark:text-gray-100">
-            +15% bump
-          </span>
-          means your chance becomes ~11.5% for similar applications. It’s an estimate to help you prioritize.
-        </div>
-      )}
+{showHelp && (
+  <div className="mb-3 rounded-lg bg-gray-50 p-3 text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-200">
+    <div className="font-semibold">What the % means</div>
+    It’s an estimate of how much this action could improve your interview chances.
+    If your baseline chance is about 10%, a
+    <span className="mx-1 rounded-md bg-gray-200 px-1 py-0.5 text-[11px] font-semibold text-gray-800 dark:bg-gray-700 dark:text-gray-100">
+      +15%
+    </span>
+    suggests your chance could be ~11.5%. Use it as a guide, not a guarantee.
+  </div>
+)}
 
       {/* Guards */}
       {!hasProfile ? (
@@ -168,9 +172,9 @@ export function Tradeoffs({ profile, pathTargets }: Props) {
                       </span>
                       <span className="text-sm font-semibold">{it.factor}</span>
                     </div>
-                    <div className="text-xs text-gray-600 dark:text-gray-300">
-                      +{pct}% estimated bump
-                    </div>
+<div className="text-xs text-gray-600 dark:text-gray-300">
+  +{pct}% estimated boost
+</div>
                   </div>
 
                   {/* Progress bar */}
@@ -233,9 +237,13 @@ export function Tradeoffs({ profile, pathTargets }: Props) {
                 >
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis type="number" tickFormatter={(v) => `${v}%`} />
-                  <YAxis type="category" dataKey="factor" width={180} />
+                  <YAxis type="category" dataKey="factor" width={180} tickFormatter={(v) => truncate(String(v))} />
+<Tooltip
+  formatter={(v: number) => [`${v}%`, "Improvement"]}
+  labelFormatter={(label: string) => label}
+/>
                   <Tooltip
-                    formatter={(v: number) => [`${v}% estimated bump`, "Factor"]}
+                    formatter={(v: number) => [`${v}% estimated boost`, "Factor"]}
                   />
                   <Bar dataKey="pct" radius={[6, 6, 6, 6]} />
                 </BarChart>

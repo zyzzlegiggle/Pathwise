@@ -60,8 +60,8 @@ export default function CareerAgentUI() {
     if (!profile || !location) return;
     let cancelled = false;
     (async () => {
-      // const data = await fetchPathExplorerData(profile)
-      // if (!cancelled) setPathData(data);
+      const data = await fetchPathExplorerData(profile)
+      if (!cancelled) setPathData(data);
     })();
     return () => {
       cancelled = true;

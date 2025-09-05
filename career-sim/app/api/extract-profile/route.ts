@@ -1,6 +1,6 @@
 // app/api/ingest/route.ts
 import { prisma } from "@/lib/db";
-import { structuredConfig, structuredOutput } from "@/lib/llm";
+import { embedText, structuredConfig, structuredOutput } from "@/lib/llm";
 import { Type } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -84,6 +84,16 @@ async function ingestProfile(userId: bigint, resumeText: string, extracted: LlmE
         // updated_at will auto-touch via @updatedAt
       },
     });
+    const embedResume = await embedText(resumeText);
+    const embedResumeStr = JSON.stringify(embedResume); 
+      // e.g. "[0.12,0.34,0.56,...]"
+
+      await tx.$executeRaw`
+        UPDATE user_profile
+        SET resume_embedding = ${embedResumeStr}
+        WHERE user_id = ${userId}
+      `;
+
 
     // Sync skills:
     // 1) fetch existing

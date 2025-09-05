@@ -84,6 +84,8 @@ Resume snippet: ${(input.resume ?? "").slice(0, 1500)}
 
 Output rules
 - firstOffer as "<integer> wks"
+-1 year compensation in currency based on its location. Example: USD 100, SGD 100, MYR 100
+-3 year compensation in currency based on its location. Example: USD 100, SGD 100, MYR 100
 - risk/burnout: Low/Medium/High
 Return JSON per schema only.
 `;

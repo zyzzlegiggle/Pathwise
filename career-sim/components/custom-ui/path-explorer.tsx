@@ -1,7 +1,7 @@
 'use client'
 import { DbUserProfile, PathApiProfile, PathExplorerData, UIUserProfile } from "@/types/path-explorer-data";
 import { UserProfile } from "@prisma/client";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import ReactFlow, { Background, Controls, MiniMap } from "reactflow";
 import { Modal } from "./modal";
 
@@ -89,6 +89,19 @@ function normalizePathData(raw: any): PathExplorerData {
 export function PathExplorer({ data }: { planMode?: string; data?: PathExplorerData }) {
   const [showAllFoundational, setShowAllFoundational] = useState(false);
   const [showAllPortfolio, setShowAllPortfolio] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!data) {
+      setLoading(true);
+      // simulate async loading fallback (optional, in case parent doesn’t pass data yet)
+      const t = setTimeout(() => setLoading(false), 500);
+      return () => clearTimeout(t);
+    }
+  }, [data]);
+
+   
+
   const allTargets = data?.targets ?? [
     { id: "associate-pm", label: "Associate PM", missingSkills: ["PRD writing", "Backlog grooming"] },
     { id: "business-analyst", label: "Business Analyst", missingSkills: ["SQL", "Dashboards"] },
@@ -132,6 +145,19 @@ export function PathExplorer({ data }: { planMode?: string; data?: PathExplorerD
   const foundational = bridges.find(b => b.id === "bridge-foundational")?.resources ?? [];
   const portfolio = bridges.find(b => b.id === "bridge-portfolio")?.resources ?? [];
 
+  if (loading) {
+    return (
+      <div className="rounded-xl border p-4 animate-pulse dark:border-gray-800">
+        <div className="h-[220px] md:h-[260px] rounded-lg bg-gray-100 dark:bg-gray-800" />
+        <div className="mt-3 h-5 w-40 rounded bg-gray-100 dark:bg-gray-800" />
+        <div className="mt-2 grid gap-2 md:grid-cols-2">
+          <div className="h-20 rounded bg-gray-100 dark:bg-gray-800" />
+          <div className="h-20 rounded bg-gray-100 dark:bg-gray-800" />
+        </div>
+      </div>
+    );
+  }
+
   return (
 <div className="rounded-xl border overflow-hidden dark:border-gray-800">      {/* shorter graph */}
       <div className="h-[220px] md:h-[260px] overflow-hidden">
@@ -172,7 +198,7 @@ export function PathExplorer({ data }: { planMode?: string; data?: PathExplorerD
                 </div>
               </li>
             ))}
-            {foundational.length === 0 && <li className="text-xs text-gray-500">No modules yet — placeholders shown once gaps are detected.</li>}
+            {foundational.length === 0 && <li className="text-xs text-gray-500">No modules yet </li>}
           </ul>
         </section>
 
@@ -192,7 +218,7 @@ export function PathExplorer({ data }: { planMode?: string; data?: PathExplorerD
                 </div>
               </li>
             ))}
-            {portfolio.length === 0 && <li className="text-xs text-gray-500">No projects yet — placeholders shown once gaps are detected.</li>}
+            {portfolio.length === 0 && <li className="text-xs text-gray-500">No projects yet</li>}
           </ul>
         </section>
       </div>
