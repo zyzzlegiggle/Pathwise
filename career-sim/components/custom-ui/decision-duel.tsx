@@ -200,11 +200,12 @@ export function DecisionDuel({
 
   {/* Right: metrics + chart */}
   <div className="space-y-3 lg:col-span-2">
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-<Metric label="Offer timeline (weeks)" value={`${mA.firstOffer} / ${mB.firstOffer}`} hint="A / B" />
- <Metric label={`Year-1 pay (${targetA ?? "—"} / ${targetB ?? "—"})`} value={`${mA.comp1y} / ${mB.comp1y}`} />
-          <Metric label="Year-3 pay potential" value={`${mA.comp3y} / ${mB.comp3y}`} />
-          <Metric label="Burnout risk" value={`${mA.burnout} / ${mB.burnout}`} />    </div>
+  <div className="grid grid-cols-2 gap-3 md:grid-cols-4 items-stretch">
+    <Metric label="Offer timeline (weeks)" value={`${mA.firstOffer} / ${mB.firstOffer}`} hint="A / B" />
+    <Metric label={`Year-1 pay (${targetA ?? "—"} / ${targetB ?? "—"})`} value={`${mA.comp1y} / ${mB.comp1y}`} />
+    <Metric label="Year-3 pay potential" value={`${mA.comp3y} / ${mB.comp3y}`} />
+    <Metric label="Burnout risk" value={`${mA.burnout} / ${mB.burnout}`} />
+  </div>
 
     <div className="rounded-2xl border p-3 transition hover:shadow-sm dark:border-gray-800">
       <div className="mb-1 flex items-center gap-2 text-sm font-semibold">

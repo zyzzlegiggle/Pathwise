@@ -1,22 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
+import {
+  START,
+  END,
+  MessagesAnnotation,
+  StateGraph,
+  // MemorySaver,  // ⬅️ remove
+} from '@langchain/langgraph';
 
-export const runtime = 'nodejs'; // or 'edge' if you prefer (adjust fetch accordingly)
+export const runtime = 'nodejs';
 
+const llm = new ChatGoogleGenerativeAI({
+  model: 'gemini-2.5-flash',
+  temperature: 0,
+});
+
+const callModel = async (state: typeof MessagesAnnotation.State) => {
+  const response = await llm.invoke(state.messages);
+  return { messages: response };
+};
+
+const workflow = new StateGraph(MessagesAnnotation)
+  .addNode('model', callModel)
+  .addEdge(START, 'model')
+  .addEdge('model', END);
+
+const app = workflow.compile(); // ✅ stateless
+
+type WireMessage = { role: 'user' | 'assistant' | 'system'; content: string };
 type ChatPayload = {
+  threadId: string;
   profile: {
     userName: string;
     yearsExp?: number;
     education?: string;
     skills?: string[];
-    // add any other fields you keep in UserProfile
   };
-  messages: { role: 'user' | 'assistant' | 'system'; content: string }[];
+  messages: WireMessage[];
 };
 
 export async function POST(req: NextRequest) {
   try {
     const { profile, messages } = (await req.json()) as ChatPayload;
 
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return NextResponse.json({ error: 'messages array is required' }, { status: 400 });
+    }
+
+    // Build one system prompt per request
     const systemPrompt = `
 You are a concise, pragmatic career coach inside a UI called "Career Strategy Studio".
 - Be specific and measurable when recommending actions (timelines, resources, deliverables).
@@ -29,46 +60,21 @@ User profile:
 - Experience (years): ${profile?.yearsExp ?? '—'}
 - Education: ${profile?.education ?? '—'}
 - Skills: ${(profile?.skills ?? []).join(', ') || '—'}
-    `.trim();
+`.trim();
 
-    const body = {
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        ...messages.filter(m => m.role !== 'system'),
-      ],
-      temperature: 0.4,
-    };
+    // Make sure there is only ONE system message at the very beginning
+    const clientTurns = messages.filter(m => m.role !== 'system');
+    const input: WireMessage[] = [{ role: 'system', content: systemPrompt }, ...clientTurns];
 
-    const openaiKey = process.env.OPENAI_API_KEY;
-    if (!openaiKey) {
-      return NextResponse.json(
-        { error: 'Missing OPENAI_API_KEY on server' },
-        { status: 500 }
-      );
-    }
+    const output = await app.invoke({ messages: input });
 
-    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${openaiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!resp.ok) {
-      const errText = await resp.text();
-      return NextResponse.json(
-        { error: `Upstream error: ${resp.status} ${errText}` },
-        { status: 500 }
-      );
-    }
-
-    const data = await resp.json();
+    const last = output.messages[output.messages.length - 1] as any;
     const reply: string =
-      data?.choices?.[0]?.message?.content ??
-      "I couldn't generate a response this time.";
+      typeof last?.content === 'string'
+        ? last.content
+        : Array.isArray(last?.content)
+        ? last.content.map((c: any) => (typeof c === 'string' ? c : c?.text ?? '')).join('')
+        : `${last?.content ?? ''}`;
 
     return NextResponse.json({ reply });
   } catch (e: any) {

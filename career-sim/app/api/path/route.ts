@@ -288,7 +288,7 @@ export async function POST(req: NextRequest) {
       const reqSkills = await roleRequiredSkills(role, 5);
       const missing = diff(reqSkills, userSkills);
       missing.forEach((g) => gapCounter.set(g, (gapCounter.get(g) ?? 0) + 1));
-      targets.push({ id: slug(role), label: role, missingSkills: missing.slice(0, 8) });
+      targets.push({ id: slug(role), label: role, missingSkills: missing.slice(0, 5) });
     }
     const topGaps = Array.from(gapCounter.entries())
       .sort((a, b) => b[1] - a[1])

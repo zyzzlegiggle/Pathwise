@@ -106,10 +106,11 @@ export default function CareerAgentUI() {
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(280px,340px)_1fr]">
           <div className="space-y-4 lg:sticky lg:top-5">
-    <SidebarProfile profile={profile} />
+    {/* Chat first so it’s immediately visible */}
+    <ChatWidget profile={profile} variant="compact" />
 
-    {/* ADD CHAT HERE */}
-    <ChatWidget profile={profile} />
+    {/* Profile second */}
+    <SidebarProfile profile={profile} />
   </div>
             <div className="space-y-6 lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto lg:[scrollbar-gutter:stable] pr-1 lg:pr-2 lg:pl-1 motion-safe:scroll-smooth">
             <Section

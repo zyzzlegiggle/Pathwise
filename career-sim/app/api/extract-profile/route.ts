@@ -51,83 +51,85 @@ async function ingestProfile(userId: bigint, resumeText: string, extracted: LlmE
   const education = typeof extracted.education === "string" ? extracted.education.trim() : null;
   const userName = typeof extracted.userName === "string" ? extracted.userName.trim() : null;
 
-  // Ensure the user exists; we cannot create one without a unique email.
+  // 1) Do non-DB and long-running work OUTSIDE the transaction
+  //    so we don't hold a connection open while waiting on external calls.
+  //    (This was likely the main source of your timeout.)
+  const embedResume = await embedText(resumeText);
+  const embedResumeStr = JSON.stringify(embedResume);
+
+  // 2) Lightweight existence check can also be outside the transaction
   const user = await prisma.user.findUnique({ where: { user_id: userId } });
-  if (!user) {
-    throw new Error(`User ${userId.toString()} not found`);
-  }
+  if (!user) throw new Error(`User ${userId.toString()} not found`);
 
   const now = new Date();
 
-  await prisma.$transaction(async (tx) => {
-    // Update user's name if provided
-    if (userName && userName !== user.name) {
-      await tx.user.update({
+  // 3) Keep the transaction SHORT: only DB reads/writes, no network calls,
+  //    and avoid per-row concurrent upserts.
+  await prisma.$transaction(
+    async (tx) => {
+      // Update user's name if provided
+      if (userName && userName !== user.name) {
+        await tx.user.update({ where: { user_id: userId }, data: { name: userName } });
+      }
+
+      // Upsert profile fields
+      await tx.userProfile.upsert({
         where: { user_id: userId },
-        data: { name: userName },
+        create: {
+          user_id: userId,
+          resume: resumeText,
+          years_experience: years ?? undefined,
+          education: education ?? undefined,
+        },
+        update: {
+          resume: resumeText,
+          years_experience: years ?? undefined,
+          education: education ?? undefined,
+        },
       });
-    }
 
-    // Upsert profile with the raw resume + structured fields
-    await tx.userProfile.upsert({
-      where: { user_id: userId },
-      create: {
-        user_id: userId,
-        resume: resumeText,
-        years_experience: years ?? undefined,
-        education: education ?? undefined,
-      },
-      update: {
-        resume: resumeText,
-        years_experience: years ?? undefined,
-        education: education ?? undefined,
-        // updated_at will auto-touch via @updatedAt
-      },
-    });
-    const embedResume = await embedText(resumeText);
-    const embedResumeStr = JSON.stringify(embedResume); 
-      // e.g. "[0.12,0.34,0.56,...]"
+      // If resume_embedding is not in your Prisma schema (e.g., TEXT column), keep raw update.
+      // If it IS modeled (e.g., JSON), prefer a normal update with Prisma instead.
+      await tx.$executeRaw`UPDATE user_profile SET resume_embedding = ${embedResumeStr} WHERE user_id = ${userId}`;
 
-      await tx.$executeRaw`
-        UPDATE user_profile
-        SET resume_embedding = ${embedResumeStr}
-        WHERE user_id = ${userId}
-      `;
-
-
-    // Sync skills:
-    // 1) fetch existing
-    const existing = await tx.userSkill.findMany({
-      where: { user_id: userId },
-      select: { skill_name: true },
-    });
-    const existingSet = new Set(existing.map((s) => s.skill_name));
-
-    const newSet = new Set(skills);
-    const toDelete = [...existingSet].filter((s) => !newSet.has(s));
-    const toUpsert = [...newSet];
-
-    // 2) delete removed skills (if any)
-    if (toDelete.length > 0) {
-      await tx.userSkill.deleteMany({
-        where: { user_id: userId, skill_name: { in: toDelete } },
+      // --- Skill sync (bulk ops; no Promise.all in-transaction) ---
+      const existing = await tx.userSkill.findMany({
+        where: { user_id: userId },
+        select: { skill_name: true },
       });
-    }
+      const existingSet = new Set(existing.map((s) => s.skill_name));
+      const newSet = new Set(skills);
 
-    // 3) upsert new/current skills with last_updated = today
-    //    We can use createMany for pure creates, but for simplicity and to always bump last_updated,
-    //    use upsert with the composite PK.
-    await Promise.all(
-      toUpsert.map((skill_name) =>
-        tx.userSkill.upsert({
-          where: { user_id_skill_name: { user_id: userId, skill_name } },
-          create: { user_id: userId, skill_name, last_updated: now },
-          update: { last_updated: now },
-        })
-      )
-    );
-  });
+      const toDelete = [...existingSet].filter((s) => !newSet.has(s));
+      const toInsert = [...newSet].filter((s) => !existingSet.has(s));
+      const toUpdate = [...newSet].filter((s) => existingSet.has(s)); // bump last_updated for retained skills
+
+      if (toDelete.length) {
+        await tx.userSkill.deleteMany({
+          where: { user_id: userId, skill_name: { in: toDelete } },
+        });
+      }
+
+      if (toInsert.length) {
+        await tx.userSkill.createMany({
+          data: toInsert.map((skill_name) => ({ user_id: userId, skill_name, last_updated: now })),
+          skipDuplicates: true,
+        });
+      }
+
+      if (toUpdate.length) {
+        await tx.userSkill.updateMany({
+          where: { user_id: userId, skill_name: { in: toUpdate } },
+          data: { last_updated: now },
+        });
+      }
+    },
+    // Optional: raise the interactive transaction timeout to tolerate brief bursts
+    // (defaults are maxWait: 2s, timeout: 5s). Keep this modest; correctness comes from doing less work inside.
+    { timeout: 20000, maxWait: 5000 }
+  );
 }
+
 
 async function llmExtract(text: string): Promise<LlmExtracted> {
   const config: structuredConfig = {

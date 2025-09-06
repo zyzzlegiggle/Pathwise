@@ -2,44 +2,57 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Send, Loader2, Sparkles, Trash2 } from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
 import { UserProfile } from '@/types/user-profile';
 
-type ChatMessage = {
+type ChatRole = 'user' | 'assistant';
+
+export type ChatMessage = {
   id: string;
-  role: 'user' | 'assistant' | 'system';
+  role: ChatRole;
   content: string;
 };
 
-export function ChatWidget({ profile }: { profile: UserProfile }) {
+export function ChatWidget({
+  profile,
+  variant = 'default',
+}: { profile: UserProfile; variant?: 'default' | 'compact' }) {
+  const initialText =
+    variant === 'compact'
+      ? `Hi ${profile.userName}! Ask me anything.`
+      : `Hi ${profile.userName}! I’m your career coach. Ask me anything— from role options and skill gaps to a step-by-step plan for the week.`;
+
   const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: crypto.randomUUID(),
-      role: 'assistant',
-      content:
-        `Hi ${profile.userName}! I’m your career coach. Ask me anything—` +
-        `from role options and skill gaps to a step-by-step plan for the week.`,
-    },
+    { id: uuidv4(), role: 'assistant', content: initialText },
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
-  const [open, setOpen] = useState(false);
-  
+  const [threadId] = useState(uuidv4());
+
   const scrollToBottom = useCallback(() => {
-    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
+    if (!listRef.current) return;
+    listRef.current.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
   }, []);
 
   useEffect(() => {
+    // trigger on list length changes
     scrollToBottom();
-  }, [messages, scrollToBottom]);
+  }, [messages.length, scrollToBottom]);
 
   const sendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault();
     const trimmed = input.trim();
     if (!trimmed || loading) return;
 
-    const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: trimmed };
-    setMessages(prev => [...prev, userMsg]);
+    const userMsg: ChatMessage = {
+      id: uuidv4(),
+      role: 'user',
+      content: trimmed,
+    };
+
+    const next = [...messages, userMsg];
+    setMessages(next);
     setInput('');
     setLoading(true);
 
@@ -48,8 +61,9 @@ export function ChatWidget({ profile }: { profile: UserProfile }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          threadId,
           profile,
-          messages: [...messages, userMsg].map(({ role, content }) => ({ role, content })),
+          messages: next.map(({ role, content }) => ({ role, content })),
         }),
       });
 
@@ -60,22 +74,22 @@ export function ChatWidget({ profile }: { profile: UserProfile }) {
 
       const data = (await res.json()) as { reply: string };
       const assistantMsg: ChatMessage = {
-        id: crypto.randomUUID(),
+        id: uuidv4(),
         role: 'assistant',
         content: data.reply,
       };
       setMessages(prev => [...prev, assistantMsg]);
-    } catch (err: any) {
+    } catch (err) {
+      console.error(err);
       setMessages(prev => [
         ...prev,
         {
-          id: crypto.randomUUID(),
+          id: uuidv4(),
           role: 'assistant',
           content:
             "Sorry, I couldn't reach the assistant just now. Please try again in a moment.",
         },
       ]);
-      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -84,7 +98,7 @@ export function ChatWidget({ profile }: { profile: UserProfile }) {
   const clearChat = () => {
     setMessages([
       {
-        id: crypto.randomUUID(),
+        id: uuidv4(),
         role: 'assistant',
         content:
           `Chat cleared. How can I help, ${profile.userName}? ` +
@@ -93,41 +107,48 @@ export function ChatWidget({ profile }: { profile: UserProfile }) {
     ]);
   };
 
+  // container padding
+  const wrap = `rounded-2xl border bg-white/70 shadow-sm dark:border-gray-800 dark:bg-gray-900/60 ${
+    variant === 'compact' ? 'p-3' : 'p-4'
+  }`;
+
+  // messages list height + text size
+  const list = `mb-3 overflow-y-auto rounded-xl border bg-white/60 p-3 dark:border-gray-800 dark:bg-gray-900/50 ${
+    variant === 'compact' ? 'max-h-40 text-xs' : 'max-h-72 text-sm'
+  }`;
+
+  // textarea rows
+  const rows = variant === 'compact' ? 1 : 2;
+
   return (
-    <div
-      className="rounded-2xl border bg-white/70 p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900/60"
-      role="region"
-      aria-label="Chat with career coach"
-    >
+    <div className={wrap} role="region" aria-label="Chat with career coach">
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Sparkles className="h-4 w-4" />
           <span className="font-semibold">Ask Career Coach</span>
         </div>
-        <button
-          onClick={clearChat}
-          className="inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs text-gray-600 transition hover:-translate-y-[0.5px] hover:shadow-sm dark:border-gray-700 dark:text-gray-300"
-          aria-label="Clear conversation"
-          title="Clear conversation"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-          Clear
-        </button>
+        {variant !== 'compact' && (
+          <button
+            onClick={clearChat}
+            className="inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs text-gray-600 transition hover:-translate-y-[0.5px] hover:shadow-sm dark:border-gray-700 dark:text-gray-300"
+            aria-label="Clear conversation"
+            title="Clear conversation"
+            type="button"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Clear
+          </button>
+        )}
       </div>
 
-      <div
-        ref={listRef}
-className="mb-3 h-48 overflow-y-auto rounded-xl border bg-white/60 p-3 text-sm 
-             dark:border-gray-800 dark:bg-gray-900/50"
-                     aria-live="polite"
-      >
+      <div ref={listRef} className={list} aria-live="polite">
         {messages.map(m => (
           <div key={m.id} className="mb-3 last:mb-0">
             <div
               className={
                 m.role === 'user'
-                  ? 'ml-auto max-w-[85%] whitespace-pre-wrap rounded-xl border px-3 py-2 shadow-sm dark:border-gray-700 bg-white/90'
-                  : 'max-w-[95%] whitespace-pre-wrap rounded-xl border px-3 py-2 shadow-sm dark:border-gray-700 bg-gray-50/70 dark:bg-gray-900/70'
+                  ? 'ml-auto max-w-[85%] whitespace-pre-wrap rounded-xl border px-3 py-2 shadow-sm bg-white/90 dark:border-gray-700'
+                  : 'max-w-[95%] whitespace-pre-wrap rounded-xl border px-3 py-2 shadow-sm bg-gray-50/70 dark:border-gray-700 dark:bg-gray-900/70'
               }
             >
               {m.content}
@@ -148,7 +169,7 @@ className="mb-3 h-48 overflow-y-auto rounded-xl border bg-white/60 p-3 text-sm
           placeholder="Ask about roles, skills, or next steps…"
           value={input}
           onChange={e => setInput(e.target.value)}
-          rows={2}
+          rows={rows}
           aria-label="Type your message"
         />
         <button
