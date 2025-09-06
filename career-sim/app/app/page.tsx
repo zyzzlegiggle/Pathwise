@@ -28,6 +28,7 @@ import { PeopleLikeMe } from "@/components/custom-ui/people-like-me";
 import { DecisionDuel } from "@/components/custom-ui/decision-duel";
 import { PathExplorerData } from "@/types/path-explorer-data";
 import { EvidenceBuckets } from "@/types/evidence-types";
+import { ChatWidget } from "@/components/custom-ui/chat-widget";
 
 
 // --- Main App ---
@@ -104,8 +105,12 @@ export default function CareerAgentUI() {
         </header>
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(280px,340px)_1fr]">
-          <SidebarProfile profile={profile} />
+          <div className="space-y-4 lg:sticky lg:top-5">
+    <SidebarProfile profile={profile} />
 
+    {/* ADD CHAT HERE */}
+    <ChatWidget profile={profile} />
+  </div>
             <div className="space-y-6 lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto lg:[scrollbar-gutter:stable] pr-1 lg:pr-2 lg:pl-1 motion-safe:scroll-smooth">
             <Section
               title="Path Explorer"
