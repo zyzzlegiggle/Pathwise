@@ -19,6 +19,7 @@ import {
   YAxis,
 } from "recharts";
 import type { UserProfile } from "@/types/user-profile";
+import { usePushData } from "../system/session-provider";
 
 type PathTarget = { id: string; label: string; missingSkills?: string[] };
 type TradeoffItem = { factor: string; lift: number; rationale?: string };
@@ -96,6 +97,22 @@ export function Tradeoffs({ profile, pathTargets }: Props) {
   }, [items, showAll]);
 
   const truncate = (s: string) => (s.length > 24 ? s.slice(0, 24) + "…" : s);
+
+  const push = usePushData();
+ useEffect(() => {
+  // Only push when you actually have items
+  if (!Array.isArray(items) || items.length === 0) return;
+
+  // Sanitize to *plain* JSON (no functions/React nodes)
+  const payload = items.map(it => ({
+    factor: String(it.factor ?? ""),
+    lift: typeof it.lift === "number" ? it.lift : 0,
+    rationale: typeof it.rationale === "string" ? it.rationale : undefined,
+  }));
+
+  // Fire & forget (catch to silence dev warnings)
+  push("tradeoffs", payload).catch(() => {});
+}, [items, push]);
 
   return (
     <div>

@@ -26,10 +26,10 @@ export type PathEdge = { source: string; target: string };
 export type PathExplorerData = {
   targets: PathTarget[];
   bridges: PathBridge[];
-  edges: PathEdge[];         // unlabeled, kept simple
+  edges: PathEdge[];         
   meta?: {
     userSkills: string[];
-    topGaps: string[];       // union of frequent gaps across targets
+    topGaps: string[];       
   };
 };
 

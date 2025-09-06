@@ -5,6 +5,7 @@ import { Users, Clock, CircleDollarSign, Sparkles } from 'lucide-react';
 import { Chip } from './chip';
 import type { SimilarPerson } from '@/app/api/people-like-me/route';
 import { UserProfile } from '@/types/user-profile';
+import { usePushData } from '../system/session-provider';
 
 export function PeopleLikeMe({
   profile,
@@ -61,6 +62,11 @@ export function PeopleLikeMe({
       controller.abort();
     };
   }, [profile, JSON.stringify(pathTargets ?? [])]);
+
+  const push = usePushData();
+  useEffect(() => {
+    push("peopleLikeMe", items ?? []);
+  }, [JSON.stringify(items ?? []), push]);
 
   return (
     <div>

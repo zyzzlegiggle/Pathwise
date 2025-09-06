@@ -29,6 +29,9 @@ import { DecisionDuel } from "@/components/custom-ui/decision-duel";
 import { PathExplorerData } from "@/types/path-explorer-data";
 import { EvidenceBuckets } from "@/types/evidence-types";
 import { ChatWidget } from "@/components/custom-ui/chat-widget";
+import { v4 as uuidv4 } from "uuid";
+import { SessionProvider, useThreadId, usePushData } from "@/components/system/session-provider";
+
 
 
 // --- Main App ---
@@ -38,7 +41,8 @@ export default function CareerAgentUI() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [pathData, setPathData] = useState<PathExplorerData | null>(null);
   const [evidence, setEvidence] = useState<EvidenceBuckets | null>(null);
-  
+  const [threadId,setThreadId] = useState(() => uuidv4());   // ← single chat session id
+  const push = usePushData();
 
   // get location
   useEffect(() => {
@@ -54,20 +58,50 @@ export default function CareerAgentUI() {
       }
     })();
   }, []);
-
-  
-  // Load the data for components
+// Load the data for components
   useEffect(() => {
     if (!profile || !location) return;
     let cancelled = false;
     (async () => {
       const data = await fetchPathExplorerData(profile)
-      if (!cancelled) setPathData(data);
+      if (!cancelled) {
+        setPathData(data);
+        
+      }
+
     })();
     return () => {
       cancelled = true;
     };
   }, [profile]);
+
+  useEffect(() => {
+  if (!pathData) return;
+
+  // sanitize to only what chat needs
+  const payload = {
+    targets: (Array.isArray(pathData.targets) ? pathData.targets : []).map(t => ({
+      id: String(t.id ?? ""),
+      label: String(t.label ?? ""),
+    })),
+    meta: {
+      userSkills: Array.isArray(pathData.meta?.userSkills) ? pathData.meta!.userSkills.map(String) : [],
+      topGaps: Array.isArray(pathData.meta?.topGaps) ? pathData.meta!.topGaps.map(String) : [],
+    },
+  };
+
+  // only push if we actually have targets or topGaps/userSkills
+  const hasUseful =
+    (payload.targets.length > 0) ||
+    (payload.meta.userSkills.length > 0) ||
+    (payload.meta.topGaps.length > 0);
+
+  if (hasUseful) {
+    push("pathData", payload).catch(() => {});
+  }
+}, [pathData, push]);
+
+ 
 
   if (!profile) {
     return <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white p-5 dark:from-gray-950 dark:to-gray-900">
@@ -77,8 +111,11 @@ export default function CareerAgentUI() {
     </div>;
   }
 
+   
+  
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white p-5 text-gray-900 dark:from-gray-950 dark:to-gray-900 dark:text-gray-100">
+    <SessionProvider threadId={threadId}>
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white p-5 text-gray-900 dark:from-gray-950 dark:to-gray-900 dark:text-gray-100">
 <div className="mx-auto max-w-7xl motion-safe:animate-fadeIn">
           {/* Header */}
         <header
@@ -107,7 +144,7 @@ export default function CareerAgentUI() {
         <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(280px,340px)_1fr]">
           <div className="space-y-4 lg:sticky lg:top-5">
     {/* Chat first so it’s immediately visible */}
-    <ChatWidget profile={profile} variant="compact" />
+    <ChatWidget profile={profile} variant="compact" threadId={threadId}/>
 
     {/* Profile second */}
     <SidebarProfile profile={profile} />
@@ -158,5 +195,6 @@ export default function CareerAgentUI() {
         </div>
       </div>
     </div>
+    </SessionProvider>
   );
 }

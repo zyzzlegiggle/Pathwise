@@ -13,10 +13,7 @@ export type ChatMessage = {
   content: string;
 };
 
-export function ChatWidget({
-  profile,
-  variant = 'default',
-}: { profile: UserProfile; variant?: 'default' | 'compact' }) {
+export function ChatWidget({ profile, variant='default', threadId: threadIdProp }: { profile: UserProfile; variant?: 'default'|'compact'; threadId?: string; }) {
   const initialText =
     variant === 'compact'
       ? `Hi ${profile.userName}! Ask me anything.`
@@ -28,7 +25,8 @@ export function ChatWidget({
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
-  const [threadId] = useState(uuidv4());
+  console.log(threadIdProp)
+  const [threadId] = useState(() => threadIdProp || uuidv4());
 
   const scrollToBottom = useCallback(() => {
     if (!listRef.current) return;
@@ -58,14 +56,10 @@ export function ChatWidget({
 
     try {
       const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          threadId,
-          profile,
-          messages: next.map(({ role, content }) => ({ role, content })),
-        }),
-      });
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ threadId, profile, messages: next.map(({ role, content }) => ({ role, content })) }),
+  });
 
       if (!res.ok) {
         const text = await res.text();

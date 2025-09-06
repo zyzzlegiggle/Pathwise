@@ -5,6 +5,7 @@ import { clamp } from "@/lib/utils";
 import { WeekItem } from "@/types/week-plan";
 import { UserProfile } from "@/types/user-profile";
 import { PathExplorerData } from "@/types/path-explorer-data";
+import { usePushData } from "../system/session-provider";
 
 type APIResponse = {
   role: string;
@@ -28,8 +29,8 @@ export function WeekPlan({
   onHoursChange?: (h: number) => void;
 }) {
   const [localHours, setLocalHours] = useState(hoursProp);
-  const [selectedRole, setSelectedRole] = useState<string>(() => pathData?.targets?.[0]?.label ?? "Associate PM");
-  const [compact, setCompact] = useState(true);
+const [selectedRole, setSelectedRole] = useState<string>("");
+const [compact, setCompact] = useState(true);
   const [openPhase, setOpenPhase] = useState<string | null>("Foundation");
 
   const [data, setData] = useState<APIResponse | null>(null);
@@ -39,6 +40,13 @@ export function WeekPlan({
   useEffect(() => setLocalHours(hoursProp), [hoursProp]);
 
   useEffect(() => {
+  if (pathData?.targets?.[0]?.label) {
+    setSelectedRole(pathData.targets[0].label);
+  }
+}, [pathData]);
+
+  useEffect(() => {
+    if (!selectedRole) return; 
     let active = true;
     setErr(null);
     setData(null);
@@ -83,6 +91,19 @@ export function WeekPlan({
     }
     return map;
   }, [data?.weeks, phases]);
+
+  const push = usePushData();
+  useEffect(() => {
+    if (data) {
+      push("weekPlan", {
+        role: data.role,
+        phases: data.phases,
+        weeks: data.weeks.map(w => ({
+          week: w.week, title: w.title, targetHours: w.targetHours, focusSkills: w.focusSkills
+        }))
+      });
+    }
+  }, [JSON.stringify(data ?? {}), push]);
 
   return (
 <div className="min-w-0">

@@ -8,6 +8,7 @@ import {
 import { PathTarget } from "@/types/path-explorer-data";
 import { EvidenceBuckets } from "@/types/evidence-types";
 import { DecisionResponse } from "@/types/decision-response";
+import { usePushData } from "../system/session-provider";
 
 const APPROACHES = [
   "Self-study while employed",
@@ -73,6 +74,7 @@ export function DecisionDuel({
   
   const [server, setServer] = useState<DecisionResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const push = usePushData();
 
   const missingFor = (label: string) =>
     pathTargets?.find(t => t.label === label)?.missingSkills ?? [];
@@ -117,6 +119,17 @@ export function DecisionDuel({
     })();
     return () => { active = false; };
   }, [hours, location, targetA, targetB, approachA, approachB, pathTargets]);
+  
+  useEffect(() => {
+    // push only what’s useful to ask about
+    const snapshot = {
+      targetA, targetB, approachA, approachB,
+      metricsA: server?.metricsA, metricsB: server?.metricsB,
+      ttfo: server?.ttfo, // if you want CDF/raw timeline
+      location, hours
+    };
+    push("decisionDuel", snapshot);
+  }, [targetA, targetB, approachA, approachB, server, location, hours, push]);
 
     const cdf = useMemo(() => {
     if (!server?.ttfo) return [];
