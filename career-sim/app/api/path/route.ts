@@ -12,31 +12,6 @@ const uniq = <T,>(a: T[]) => Array.from(new Set(a));
 
 
 
-// route.ts (add near your helpers)
-function makeTermsFromText(s: string): string[] {
-  return uniq(
-    norm(s)
-      .split(/\s+/)
-      .filter(Boolean)
-      .map((t) => t.slice(0, 48)),
-  );
-}
-
-// Rank by overlap between query terms (from resume + user skills) and role title/aliases/requiredSkills
-function roleScore(role: {
-  title: string;
-  aliases?: any | null;
-  requiredSkills?: any | null;
-}, termSet: Set<string>) {
-  const parts: string[] = [role.title];
-  if (Array.isArray(role.aliases)) parts.push(role.aliases.join(" "));
-  if (Array.isArray(role.requiredSkills)) parts.push(role.requiredSkills.join(" "));
-  const tokens = new Set(norm(parts.join(" ")).split(/\s+/).filter(Boolean));
-  let hits = 0;
-  for (const t of termSet) if (tokens.has(t)) hits++;
-  return hits;
-}
-
 // Try DB first: vector search (if available), else keyword search.
 // Returns up to `limit` canonical role titles.
 async function dbFutureRoles(
@@ -104,7 +79,7 @@ ${resume}`;
 }
 
 // very lightweight role→skills retrieval from SkillNode (name + aliases)
-async function roleRequiredSkills(role: string, limit = 18): Promise<string[]> {
+async function roleRequiredSkills(role: string, limit = 5): Promise<string[]> {
   const terms = uniq([role, ...role.toLowerCase().split(/\s+/).filter(Boolean)]);
   const like = terms.map(() => `LOWER(name) LIKE ?`).join(" OR ");
   const alias = terms.map(() => `JSON_SEARCH(aliases, 'one', ?) IS NOT NULL`).join(" OR ");
@@ -310,7 +285,7 @@ export async function POST(req: NextRequest) {
     const targets: PathExplorerData["targets"] = [];
     const gapCounter = new Map<string, number>();
     for (const role of futureRoles) {
-      const reqSkills = await roleRequiredSkills(role, 16);
+      const reqSkills = await roleRequiredSkills(role, 5);
       const missing = diff(reqSkills, userSkills);
       missing.forEach((g) => gapCounter.set(g, (gapCounter.get(g) ?? 0) + 1));
       targets.push({ id: slug(role), label: role, missingSkills: missing.slice(0, 8) });
