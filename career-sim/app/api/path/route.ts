@@ -292,7 +292,7 @@ export async function POST(req: NextRequest) {
     }
     const topGaps = Array.from(gapCounter.entries())
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
+      .slice(0, 5)
       .map(([g]) => g);
 
     // 4) resources for bridges (unchanged)

@@ -112,7 +112,7 @@ export function PathExplorer({ data }: { planMode?: string; data?: PathExplorerD
     { id: "bridge-portfolio", label: "Practice your skills", resources: [] },
   ];
   const topGapsAll = data?.meta?.topGaps ?? allTargets.flatMap(t => t.missingSkills);
-  const topGapsLimited = topGapsAll.slice(0, 8);
+  const topGapsLimited = topGapsAll.slice(0, 5);
   const moreGapsCount = Math.max(topGapsAll.length - topGapsLimited.length, 0);
 
   const nodes = useMemo(() => {

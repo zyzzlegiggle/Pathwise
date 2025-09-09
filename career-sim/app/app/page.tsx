@@ -31,6 +31,7 @@ import { EvidenceBuckets } from "@/types/evidence-types";
 import { ChatWidget } from "@/components/custom-ui/chat-widget";
 import { v4 as uuidv4 } from "uuid";
 import { SessionProvider, useThreadId, usePushData } from "@/components/system/session-provider";
+import { ProfileEditor } from "@/components/custom-ui/profile-editor";
 
 
 
@@ -42,6 +43,7 @@ export default function CareerAgentUI() {
   const [pathData, setPathData] = useState<PathExplorerData | null>(null);
   const [evidence, setEvidence] = useState<EvidenceBuckets | null>(null);
   const [threadId,setThreadId] = useState(() => uuidv4());   // ← single chat session id
+  const [editing, setEditing] = useState(false);
   const push = usePushData();
 
   // get location
@@ -73,7 +75,7 @@ export default function CareerAgentUI() {
     return () => {
       cancelled = true;
     };
-  }, [profile]);
+  }, [profile, location]);
 
   useEffect(() => {
   if (!pathData) return;
@@ -143,12 +145,9 @@ export default function CareerAgentUI() {
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(280px,340px)_1fr]">
           <div className="space-y-4 lg:sticky lg:top-5">
-    {/* Chat first so it’s immediately visible */}
-    <ChatWidget profile={profile} variant="compact" threadId={threadId}/>
-
-    {/* Profile second */}
-    <SidebarProfile profile={profile} />
-  </div>
+              <ChatWidget profile={profile} variant="compact" threadId={threadId}/>
+              <SidebarProfile profile={profile} onEdit={() => setEditing(true)} />
+            </div>
             <div className="space-y-6 lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto lg:[scrollbar-gutter:stable] pr-1 lg:pr-2 lg:pl-1 motion-safe:scroll-smooth">
             <Section
               title="Path Explorer"
@@ -195,6 +194,18 @@ export default function CareerAgentUI() {
         </div>
       </div>
     </div>
+
+    <ProfileEditor
+        open={editing}
+        initial={profile}
+        onClose={() => setEditing(false)}
+        onSaved={(updated) => {
+          setProfile(updated);
+          // Optionally, nudge downstream recomputations:
+          setPathData(null);
+        }}
+        userId={"1"}
+      />
     </SessionProvider>
   );
 }
