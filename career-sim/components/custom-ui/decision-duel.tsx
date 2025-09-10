@@ -202,6 +202,15 @@ export function DecisionDuel({
         >
           {APPROACHES.map(a => <option key={a}>{a}</option>)}
         </select>
+        <button
+          className="text-xs underline opacity-80 hover:opacity-100"
+          onClick={() => {
+            setTargetA(prev => { const a = targetB; setTargetB(prev); return a; });
+            setApproachA(prev => { const a = approachB; setApproachB(prev); return a; });
+          }}
+        >
+          Swap A/B
+        </button>
       </div>
     </div>
 
@@ -239,12 +248,13 @@ export function DecisionDuel({
               <LineChart data={cdf} margin={{ left: 10, right: 10, top: 10, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis
+                  type="number"
                   dataKey="week"
-                  tick={{ fontSize: 12 }}
-                  label={{ value: "Week", position: "insideBottom", offset: -5 }}
+                  domain={[0, 20]}
+                  tickCount={11}
                   allowDecimals={false}
-                  tickFormatter={(v) => Math.round(v).toString()}
-                />                
+                  label={{ value: "Week", position: "insideBottom", offset: -5 }}
+                />             
                 <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} tickFormatter={(v) => `${Math.round(v)}%`} />
                 <Tooltip formatter={(v: number) => `${Math.round(v)}%`} />
                 <Legend />

@@ -125,7 +125,6 @@ export function Tradeoffs({ profile, pathTargets }: Props) {
 
            <HelpCircle size={14} /> What does the % mean?
 {showHelp ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-           {showHelp ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
          </button>
          <button
             onClick={load}
