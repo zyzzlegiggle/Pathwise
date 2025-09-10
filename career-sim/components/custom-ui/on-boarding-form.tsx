@@ -5,33 +5,22 @@ import React from "react";
 import { createPortal } from "react-dom";
 
 export async function extractProfileFromText(text: string): Promise<UserProfile> {
-  try{
-  const userId = '1';
-
-  const res = await fetch("/api/extract-profile", {
+  const res = await fetch("/api/extract-profile", {      // ← keep this path consistent
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, userId }),
+    body: JSON.stringify({ text }),                      // ← no userId
   });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error || "Failed");
 
-
-  const data: any = await res.json();
-
-
-
-  const userProfile: UserProfile = {
+  return {
     userName: data.userName,
     resume: text,
     yearsExp: data.yearsExperience,
     skills: data.skills,
     education: data.education,
     resumeNotes: data.resumeNotes ?? undefined,
-  }
-  
-  return userProfile;
-  } catch (e: any) {
-    throw new Error(e.message)
-  }
+  };
 }
 
 export function OnboardingForm({ onComplete }: { onComplete: (p: UserProfile) => void }) {
@@ -156,6 +145,20 @@ export function OnboardingForm({ onComplete }: { onComplete: (p: UserProfile) =>
           try {
             setIsSubmitting(true);
             const parsed = await extractProfileFromText(resume);
+            try {
+              const res = await fetch("/api/profile", { cache: "no-store" });
+              if (res.ok) {
+                const data = await res.json();
+                onComplete({
+                  userName: data.userName ?? parsed.userName,
+                  resume: data.resume ?? parsed.resume,
+                  yearsExp: data.yearsExperience ?? parsed.yearsExp,
+                  skills: Array.isArray(data.skills) ? data.skills : parsed.skills,
+                  education: data.education ?? parsed.education,
+                });
+                return;
+              }
+            } catch {}
             onComplete(parsed);
           } catch (e) {
             // noop – could toast if you have one

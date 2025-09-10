@@ -1,4 +1,5 @@
 // app/api/ingest/route.ts
+import { verifyJwt } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { embedText, structuredConfig, structuredOutput } from "@/lib/llm";
 import { Type } from "@google/genai";
@@ -171,18 +172,27 @@ Return a strict JSON object adhering to the provided schema. Use integers for ye
   }
 }
 
+
 export async function POST(req: NextRequest) {
-  const { text, userId } = await req.json();
+  const { text } = await req.json();         
+  if (typeof text !== "string" || !text.trim()) {
+    return NextResponse.json({ error: "Missing text" }, { status: 400 });
+  }
 
   try {
-    const extracted = await llmExtract(String(text ?? ""));
-    // Persist to DB using Prisma per schema
-    await ingestProfile(toBigIntId(userId), String(text ?? ""), extracted);
+    const token = req.cookies.get("auth_token")?.value;
+    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    // dont change this
+    const payload = await verifyJwt(token);
+    const sub = payload.sub;                 
+    const userId = BigInt(sub as string);     
+
+    const extracted = await llmExtract(text);
+    await ingestProfile(userId, text, extracted);
+
+    // return only extracted fields (no BigInt in payload)
     return NextResponse.json(extracted);
   } catch (e: any) {
-    // Surface a clean error message
-    throw new Error(`Error in extracting background: ${e.message}`);
+    return NextResponse.json({ error: e.message || "Failed to extract" }, { status: 500 });
   }
 }

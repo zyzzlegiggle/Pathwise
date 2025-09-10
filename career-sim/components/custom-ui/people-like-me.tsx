@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { Users, Clock, CircleDollarSign, Sparkles } from 'lucide-react';
-import { Chip } from './chip';
 import type { SimilarPerson } from '@/app/api/people-like-me/route';
 import { UserProfile } from '@/types/user-profile';
 import { usePushData } from '../system/session-provider';
@@ -10,9 +9,11 @@ import { usePushData } from '../system/session-provider';
 export function PeopleLikeMe({
   profile,
   pathTargets,
+  userId
 }: {
   profile: UserProfile;
   pathTargets?: Array<{ id: string; label: string }>;
+  userId: string
 }) {
   const [items, setItems] = useState<SimilarPerson[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +38,7 @@ export function PeopleLikeMe({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           cache: 'no-store',
-          body: JSON.stringify({ profile, targets: pathTargets, userId: 1 }),
+          body: JSON.stringify({ profile, targets: pathTargets, userId: userId }),
           signal: controller.signal,
         });
 

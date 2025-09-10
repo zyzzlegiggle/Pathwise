@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { verifyJwt } from "@/lib/auth";
 
-const PROTECTED = ["/app"]; // add paths to protect
+const PROTECTED = ["/app", "/protected"]; // add paths to protect
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

@@ -44,6 +44,8 @@ export default function CareerAgentUI() {
   const [evidence, setEvidence] = useState<EvidenceBuckets | null>(null);
   const [threadId,setThreadId] = useState(() => uuidv4());   // ← single chat session id
   const [editing, setEditing] = useState(false);
+  const [me, setMe] = useState<{ id: string; email?: string; name?: string } | null>(null);
+  const [bootstrapping, setBootstrapping] = useState(true);
   const push = usePushData();
 
   // get location
@@ -60,6 +62,45 @@ export default function CareerAgentUI() {
       }
     })();
   }, []);
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/me", { cache: "no-store" });
+        const { user } = await res.json();
+        setMe(user ?? null);
+      } catch {}
+    })();
+  }, []);
+  // Bootstrap profile from server when logged in
+  useEffect(() => {
+    (async () => {
+      if (!me) { setBootstrapping(false); return; }
+      try {
+        const res = await fetch("/api/profile", { cache: "no-store" });
+        if (res.status === 204) {
+          // no profile yet -> show onboarding
+          setProfile(null);
+        } else if (res.ok) {
+          const data = await res.json();
+          // Map API -> your UserProfile type
+          setProfile({
+            userName: data.userName ?? "",
+            resume: data.resume ?? "",
+            yearsExp: data.yearsExperience ?? 0,
+            skills: Array.isArray(data.skills) ? data.skills : [],
+            education: data.education ?? "",
+          });
+        } else {
+          // fallback to onboarding if something went wrong
+          setProfile(null);
+        }
+      } catch {
+        setProfile(null);
+      } finally {
+        setBootstrapping(false);
+      }
+    })();
+  }, [me]);
 // Load the data for components
   useEffect(() => {
     if (!profile || !location) return;
@@ -104,7 +145,13 @@ export default function CareerAgentUI() {
 }, [pathData, push]);
 
  
-
+  if (bootstrapping) {
+    return (
+      <div className="min-h-screen grid place-items-center">
+        <div className="text-sm text-gray-500">Loading…</div>
+      </div>
+    );
+  }
   if (!profile) {
     return <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white p-5 dark:from-gray-950 dark:to-gray-900">
       <div className="animate-fadeIn">
@@ -187,7 +234,7 @@ export default function CareerAgentUI() {
               <WeekPlan hours={hours} profile={profile} pathData={pathData ?? undefined} />
             </Section>
             <Section title="People like me" icon={<Users className="h-5 w-5" />}>
-                <PeopleLikeMe profile={profile} pathTargets={pathData?.targets} />
+                <PeopleLikeMe profile={profile} pathTargets={pathData?.targets} userId={me?.id ?? ""}   />
             </Section>
             </div>
           </div>
@@ -195,17 +242,16 @@ export default function CareerAgentUI() {
       </div>
     </div>
 
-    <ProfileEditor
-        open={editing}
-        initial={profile}
-        onClose={() => setEditing(false)}
-        onSaved={(updated) => {
-          setProfile(updated);
-          // Optionally, nudge downstream recomputations:
-          setPathData(null);
-        }}
-        userId={"1"}
-      />
+  <ProfileEditor
+    open={editing}
+    initial={profile}
+    onClose={() => setEditing(false)}
+    onSaved={(updated) => {
+      setProfile(updated);
+      setPathData(null);
+    }}
+    userId={me?.id ?? ""}   
+  />
     </SessionProvider>
   );
 }

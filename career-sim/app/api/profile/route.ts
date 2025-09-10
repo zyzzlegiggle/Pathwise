@@ -1,6 +1,7 @@
 // app/api/profile/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { verifyJwt } from "@/lib/auth";
 
 function toBigIntId(v: unknown): bigint {
   if (typeof v === "bigint") return v;
@@ -32,9 +33,11 @@ function normalizeSkills(arr: unknown): string[] {
 
 export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const userIdParam = searchParams.get("userId") ?? "1"; // fallback like your extractor
-    const userId = toBigIntId(userIdParam);
+    // 🔁 Read user from cookie instead of ?userId
+    const token = req.cookies.get("auth_token")?.value;
+    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const payload = await verifyJwt(token);
+    const userId = BigInt(String(payload.sub));
 
     const user = await prisma.user.findUnique({
       where: { user_id: userId },
@@ -53,11 +56,14 @@ export async function GET(req: NextRequest) {
       orderBy: { skill_name: "asc" },
     });
 
+    // If no profile yet, return 204 so the client knows to show onboarding
+    if (!profile) return new NextResponse(null, { status: 204 });
+
     return NextResponse.json({
       userName: user.name ?? "",
-      yearsExperience: profile?.years_experience ?? 0,
-      education: profile?.education ?? "",
-      resume: profile?.resume ?? "",
+      yearsExperience: profile.years_experience ?? 0,
+      education: profile.education ?? "",
+      resume: profile.resume ?? "",
       skills: skills.map(s => s.skill_name),
     });
   } catch (e: any) {
@@ -67,16 +73,15 @@ export async function GET(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
-    const body = await req.json();
-    const {
-      userId = "1",
-      userName,
-      yearsExperience,
-      education,
-      skills: rawSkills,
-    } = body ?? {};
+  // 🔁 Read user from cookie instead of body.userId
+    const token = req.cookies.get("auth_token")?.value;
+    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const payload = await verifyJwt(token);
+    const id = BigInt(String(payload.sub));
 
-    const id = toBigIntId(userId);
+    const body = await req.json();
+    const { userName, yearsExperience, education, skills: rawSkills } = body ?? {};
+
     const years = clampYears(yearsExperience);
     const skills = normalizeSkills(rawSkills);
 

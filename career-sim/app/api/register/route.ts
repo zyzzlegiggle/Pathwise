@@ -23,10 +23,13 @@ export async function POST(req: Request) {
       select: { user_id: true, email: true, name: true },
     });
 
-    // auto-login after register (optional)
-    const token = await signJwt({ sub: String(user.user_id), email: user.email, name: user.name });
+    // make it JSON-safe
+    const safeUser = { ...user, user_id: user.user_id.toString() };
 
-    const res = NextResponse.json({ ok: true, user });
+    // sign with a string sub (you already do this)
+    const token = await signJwt({ sub: safeUser.user_id, email: safeUser.email, name: safeUser.name });
+
+    const res = NextResponse.json({ ok: true, user: safeUser });
     res.cookies.set(authCookie.name, token, authCookie.options);
     return res;
   } catch (e) {
