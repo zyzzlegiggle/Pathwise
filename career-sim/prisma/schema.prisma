@@ -12,6 +12,7 @@ model User {
   email            String   @unique
   name             String?
   country          String?
+  passwordHash  String?
   created_at       DateTime @default(now())
   skills           UserSkill[]
   userProfile      UserProfile?
