@@ -251,10 +251,25 @@ export function PathExplorer({ data }: { planMode?: string; data?: PathExplorerD
         <ul className="space-y-2">
           {portfolio.map(r => (
             <li key={r.id} className="rounded-lg border p-2 text-xs dark:border-gray-800">
-              <div className="font-medium">{r.title}</div>
+            <a className="block" href={r.url!} target="_blank" rel="noreferrer noopener">
+                          <div className="font-medium">
+              {r.url ? (
+                <a
+                  className="underline underline-offset-2"
+                  href={r.url}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                >
+                  {r.title}
+                </a>
+              ) : (
+                r.title
+              )}
+            </div>
               <div className="mt-1 text-[11px] text-gray-500">
                 {r.provider ?? "—"} · {r.hours ? `${r.hours}h` : "weekend project"} · {r.cost ? `≈$${r.cost}` : "free"}
               </div>
+            </a>
             </li>
           ))}
         </ul>

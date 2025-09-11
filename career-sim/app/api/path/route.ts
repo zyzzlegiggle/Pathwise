@@ -4,6 +4,10 @@ import { Type } from "@google/genai";
 import { structuredOutput, structuredConfig } from "@/lib/llm";
 import type { PathExplorerData, ResourceLite } from "@/types/path-explorer-data";
 import { prisma } from "@/lib/db";
+import { serpSearchUrls } from "@/lib/search-serpapi";
+import { courseQuery, projectQuery } from "@/lib/query-builder";
+import { fetchSnapshot } from "@/lib/fetch-page";
+import { extractCourse, extractProject } from "@/lib/extract-course";
 
 const slug = (s: string) =>
   s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48) || "target";
@@ -150,79 +154,68 @@ function diff(required: string[], have: string[]) {
   return required.filter((s) => !set.has(norm(s)));
 }
 
-// fetch resources that target any of the gaps (Resource table may be empty)
-// if empty, generate **placeholders** per gap
+
+
+const CONF_THRESHOLD_COURSE = 0.45;
+const CONF_THRESHOLD_PROJECT = 0.40;
+
+async function webCoursesFor(skill: string, limit = 2): Promise<ResourceLite[]> {
+  const urls = await serpSearchUrls(courseQuery(skill), 8);
+  const snaps = (await Promise.all(urls.map(fetchSnapshot))).filter(Boolean) as any[];
+  const extracted = await Promise.all(snaps.map(s => extractCourse(s, skill)));
+  // dedupe by normalized URL/title, sort by confidence desc
+  const norm = (u?: string) => (u ? u.replace(/[#?].*$/, "").replace(/\/$/, "") : "");
+  const seen = new Set<string>();
+  const dedup = extracted
+    .sort((a, b) => b._confidence - a._confidence)
+    .filter(e => {
+      const key = norm(e.url) || e.title;
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return e._confidence >= CONF_THRESHOLD_COURSE;
+    })
+    .slice(0, limit);
+  return dedup;
+}
+
+async function webProjectsFor(skill: string, limit = 2): Promise<ResourceLite[]> {
+  const urls = await serpSearchUrls(projectQuery(skill), 8);
+  const snaps = (await Promise.all(urls.map(fetchSnapshot))).filter(Boolean) as any[];
+  const extracted = await Promise.all(snaps.map(s => extractProject(s, skill)));
+  const norm = (u?: string) => (u ? u.replace(/[#?].*$/, "").replace(/\/$/, "") : "");
+  const seen = new Set<string>();
+  const dedup = extracted
+    .sort((a, b) => b._confidence - a._confidence)
+    .filter(e => {
+      const key = norm(e.url) || e.title;
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return e._confidence >= CONF_THRESHOLD_PROJECT;
+    })
+    .slice(0, limit);
+  return dedup;
+}
+
 async function resourcesForGaps(
   gaps: string[],
   kind: "learn" | "project",
-  limitPerSkill = 2,
+  limitPerSkill = 2
 ): Promise<ResourceLite[]> {
   if (gaps.length === 0) return [];
-
-  // Try DB first (JSON skill_targets or title LIKE)
-  const results: ResourceLite[] = [];
-  try {
-    const orTitle = gaps.map(() => `LOWER(title) LIKE ?`).join(" OR ");
-    const orJSON = gaps.map(() => `JSON_SEARCH(skill_targets, 'one', ?) IS NOT NULL`).join(" OR ");
-    const likes = gaps.map((g) => `%${g.toLowerCase()}%`);
-    const sql = `
-      SELECT resource_id, title, provider, url, hours_estimate, cost, skill_targets
-      FROM resources
-      WHERE (${orTitle}) ${orJSON ? `OR (${orJSON})` : ""}
-      LIMIT ?
-    `;
-    // @ts-ignore
-    const rows = (await prisma.$queryRawUnsafe(sql, ...likes, ...gaps, gaps.length * limitPerSkill)) as Array<{
-      resource_id: bigint; title: string | null; provider: string | null; url: string | null;
-      hours_estimate: any | null; cost: any | null; skill_targets: any | null;
-    }>;
-    for (const r of rows) {
-      results.push({
-        id: String(r.resource_id),
-        title: r.title ?? "Untitled",
-        provider: r.provider ?? undefined,
-        url: r.url ?? undefined,
-        hours: r.hours_estimate ? Number(r.hours_estimate) : null,
-        cost: r.cost ? Number(r.cost) : null,
-        skills: Array.isArray(r.skill_targets) ? r.skill_targets : [],
-        kind,
-      });
-    }
-  } catch {
-    // ignore and fall through to placeholders
+  const out: ResourceLite[] = [];
+  for (const g of gaps) {
+    const items = kind === "learn" ? await webCoursesFor(g, limitPerSkill)
+                                   : await webProjectsFor(g, limitPerSkill);
+    out.push(...items);
   }
-
-  if (results.length > 0) return results.slice(0, gaps.length * limitPerSkill);
-
-  // Placeholders: 1 learn + 1 project per skill (or filtered by kind)
-  const placeholders: ResourceLite[] = [];
-  let i = 0;
-  for (const skill of gaps) {
-    if (kind === "learn") {
-      placeholders.push({
-        id: `ph-learn-${i++}`,
-        title: `Intro to ${skill}`,
-        provider: "Placeholder",
-        url: "#",
-        hours: 4,
-        cost: 0,
-        skills: [skill],
-        kind: "learn",
-      });
-    } else {
-      placeholders.push({
-        id: `ph-proj-${i++}`,
-        title: `Build a mini-project: ${skill} in practice`,
-        provider: "Placeholder",
-        url: "#",
-        hours: 6,
-        cost: 0,
-        skills: [skill],
-        kind: "project",
-      });
-    }
+  if (out.length === 0) {
+    // fallback placeholders (your original behavior)
+    let i = 0;
+    return kind === "learn"
+      ? []
+      : []
   }
-  return placeholders;
+  return out;
 }
 
 export async function POST(req: NextRequest) {
@@ -288,7 +281,7 @@ export async function POST(req: NextRequest) {
       const reqSkills = await roleRequiredSkills(role, 5);
       const missing = diff(reqSkills, userSkills);
       missing.forEach((g) => gapCounter.set(g, (gapCounter.get(g) ?? 0) + 1));
-      targets.push({ id: slug(role), label: role, missingSkills: missing.slice(0, 5) });
+      targets.push({ id: slug(role), label: role, missingSkills: missing.slice(0, 2) });
     }
     const topGaps = Array.from(gapCounter.entries())
       .sort((a, b) => b[1] - a[1])
