@@ -27,13 +27,21 @@ export async function verifyJwt(token: string) {
   return payload;
 }
 
-export const authCookie = {
-  name: COOKIE_NAME,
-  options: {
+
+const DEFAULT_EXP_SECONDS = 60 * 60 * 24 * 7;      // 7 days
+const LONG_EXP_SECONDS = 60 * 60 * 24 * 30;        // 30 days
+
+export function getAuthCookieOptions(remember: boolean) {
+  return {
     httpOnly: true,
     sameSite: "lax" as const,
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    maxAge: EXP_SECONDS,
-  },
+    // If remember=false -> session cookie (no maxAge)
+    ...(remember ? { maxAge: LONG_EXP_SECONDS } : {}),
+  };
+}
+
+export const authCookie = {
+  name: "auth_token",
 };

@@ -95,7 +95,7 @@ export function ProfileEditor({ open, initial, onClose, onSaved, userId = "1" }:
               placeholder="Type skills, separated by commas"
             />
             <p className="mt-1 text-xs text-gray-500">
-              Example: React, TypeScript, SQL
+              Example: Attention to detail, communication, sales
             </p>
           </label>
         </div>

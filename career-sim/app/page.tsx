@@ -14,8 +14,10 @@ import {
   Users,
   Zap,
   Github,
-  Linkedin
+  Linkedin,
+  Loader2
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 /*
   How to use
@@ -76,12 +78,9 @@ function NavBar() {
             <a href="#pricing" className="text-sm text-gray-700 hover:opacity-80 dark:text-gray-300">Pricing</a>
           </div>
           <div className="flex items-center gap-2">
-            <Link
-              href="/app"
-              className="group inline-flex items-center gap-2 rounded-xl border bg-gray-900 px-3 py-2 text-sm text-white transition-all duration-200 hover:scale-[1.02] hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"
-            >
-              Launch app <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-            </Link>
+          <LaunchButton className="group inline-flex items-center gap-2 rounded-xl border bg-gray-900 px-3 py-2 text-sm text-white transition-all duration-200 hover:scale-[1.02] hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100">
+            Launch app <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+          </LaunchButton>
           </div>
         </motion.nav>
       </div>
@@ -120,12 +119,9 @@ function Hero() {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="mt-6 flex flex-wrap items-center gap-3"
           >
-            <Link
-              href="/app"
-              className="group inline-flex items-center gap-2 rounded-2xl border bg-gray-900 px-4 py-2 text-sm text-white shadow-sm transition-all duration-200 hover:scale-105 hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"
-            >
+            <LaunchButton className="group inline-flex items-center gap-2 rounded-2xl border bg-gray-900 px-4 py-2 text-sm text-white shadow-sm transition-all duration-200 hover:scale-105 hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100">
               Start free <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-            </Link>
+            </LaunchButton>
             <a
               href="#preview"
               className="inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm text-gray-800 transition-all hover:scale-105 dark:border-gray-800 dark:text-gray-200"
@@ -308,12 +304,9 @@ function Preview() {
             {t.title}
           </button>
         ))}
-        <Link
-          href="/app"
-          className="group ml-auto inline-flex items-center gap-2 rounded-xl border bg-gray-900 px-3 py-1.5 text-sm text-white transition-all hover:scale-105 dark:bg-white dark:text-gray-900"
-        >
-          Launch app <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-        </Link>
+<LaunchButton className="group ml-auto inline-flex items-center gap-2 rounded-xl border bg-gray-900 px-3 py-1.5 text-sm text-white transition-all hover:scale-105 dark:bg-white dark:text-gray-900">
+  Launch app <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+</LaunchButton>
       </div>
 
       <motion.div
@@ -413,12 +406,9 @@ function CTA() {
             <h3 className="text-2xl font-semibold tracking-tight">Ready to make your next move?</h3>
             <p className="mt-1 text-sm opacity-90">Paste your background and get a plan you can follow tonight.</p>
           </div>
-          <Link
-            href="/app"
-            className="group inline-flex items-center gap-2 rounded-2xl border bg-white px-4 py-2 text-sm text-gray-900 transition-all hover:scale-105 dark:bg-gray-900 dark:text-white"
-          >
+          <LaunchButton className="group inline-flex items-center gap-2 rounded-2xl border bg-white px-4 py-2 text-sm text-gray-900 transition-all hover:scale-105 dark:bg-gray-900 dark:text-white">
             Launch app <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-          </Link>
+          </LaunchButton>
         </div>
       </motion.div>
     </section>
@@ -506,5 +496,31 @@ function AnimatedBackground() {
         className="pointer-events-none fixed inset-0 -z-10 bg-[linear-gradient(to_right,rgba(0,0,0,0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.06)_1px,transparent_1px)] bg-[size:24px_24px] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.06)_1px,transparent_1px)]"
       />
     </>
+  );
+}
+
+
+function LaunchButton({ className, children }: { className: string; children: React.ReactNode }) {
+  const router = useRouter();
+  const [loading, setLoading] = React.useState(false);
+
+  return (
+    <button
+      onClick={() => {
+        setLoading(true);
+        router.push("/app");
+      }}
+      disabled={loading}
+      className={`${className} ${loading ? "opacity-70 cursor-not-allowed" : ""}`}
+    >
+      {loading ? (
+        <span className="inline-flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Redirecting…
+        </span>
+      ) : (
+        children
+      )}
+    </button>
   );
 }

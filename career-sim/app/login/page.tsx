@@ -9,6 +9,7 @@ export default function LoginPage() {
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPw, setShowPw] = useState(false);
+  const [remember, setRemember] = useState(true);
 
   return (
     <div className="min-h-screen grid place-items-center p-6 bg-gradient-to-b from-gray-50 to-white dark:from-gray-950 dark:to-gray-900">
@@ -22,7 +23,7 @@ export default function LoginPage() {
             const res = await fetch("/api/login", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ email, password }),
+              body: JSON.stringify({ email, password, remember }),
             });
             const data = await res.json();
             setLoading(false);
@@ -32,7 +33,7 @@ export default function LoginPage() {
           className="space-y-3"
         >
           <input className="w-full border rounded p-2" placeholder="Email" type="email"
-                value={email} onChange={e=>setEmail(e.target.value)} />
+                value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email"  />
           <div className="relative">
             <input
               className="w-full border rounded p-2 pr-10"
@@ -40,6 +41,7 @@ export default function LoginPage() {
               type={showPw ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
             />
             <button
               type="button"
@@ -61,10 +63,15 @@ export default function LoginPage() {
           </button>
         </form>
         <div className="mt-4 flex items-center justify-between">
-          <label className="inline-flex items-center gap-2 text-sm text-gray-600">
-            <input type="checkbox" className="h-4 w-4" onChange={() => {}} />
-            Remember me
-          </label>
+        <label className="inline-flex items-center gap-2 text-sm text-gray-600">
+          <input
+            type="checkbox"
+            className="h-4 w-4"
+            checked={remember}
+            onChange={(e) => setRemember(e.target.checked)}
+          />
+          Remember me
+        </label>
           <a href="/register" className="text-sm text-blue-600 hover:underline">
             Create an account
           </a>

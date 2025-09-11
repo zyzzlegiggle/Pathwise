@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { authCookie, signJwt } from "@/lib/auth";
+import { authCookie, getAuthCookieOptions, signJwt } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
 export async function POST(req: Request) {
   try {
-    const { email, password } = await req.json();
+    const { email, password, remember } = await req.json();
     if (!email || !password) {
       return NextResponse.json({ error: "Email and password are required." }, { status: 400 });
     }
@@ -27,8 +27,8 @@ export async function POST(req: Request) {
   const token = await signJwt({ sub: safeUser.user_id, email: safeUser.email, name: safeUser.name });
 
   const res = NextResponse.json({ ok: true, user: safeUser });
-  res.cookies.set(authCookie.name, token, authCookie.options);
-  return res;
+res.cookies.set(authCookie.name, token, getAuthCookieOptions(Boolean(remember)));
+return res;
 
   } catch (e) {
     console.error(e);
