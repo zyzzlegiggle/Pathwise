@@ -29,12 +29,95 @@ export function WeekPlan({
   onHoursChange?: (h: number) => void;
 }) {
   const [localHours, setLocalHours] = useState(hoursProp);
-const [selectedRole, setSelectedRole] = useState<string>("");
-const [compact, setCompact] = useState(true);
+  const [selectedRole, setSelectedRole] = useState<string>("");
+  const [compact, setCompact] = useState(true);
   const [openPhase, setOpenPhase] = useState<string | null>("Foundation");
 
   const [data, setData] = useState<APIResponse | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [gStatus, setGStatus] = useState<{ connected: boolean } | null>(null);
+  const [eventIds, setEventIds] = useState<Record<number, string>>({});
+
+
+async function addWeekToCalendar(w: WeekItem) {
+const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Singapore";
+const start = new Date();
+// Example: schedule each week on its Monday 7pm local, 2h
+const monday = new Date();
+monday.setDate(start.getDate() + (1 - start.getDay() + 7) % 7 + (w.week - 1) * 7);
+monday.setHours(19, 0, 0, 0);
+const end = new Date(monday); end.setHours(monday.getHours() + 2);
+const res = await fetch("/api/google/events", {
+method: "POST",
+headers: { "Content-Type": "application/json" },
+body: JSON.stringify({
+title: `Week ${w.week}: ${w.title}`,
+description: `Target ${w.targetHours ?? perWeek}h. Focus: ${(w.focusSkills||[]).join(", ")}`,
+startISO: monday.toISOString(),
+endISO: end.toISOString(),
+timezone: tz,
+idempotencyKey: `weekplan-${selectedRole}-${w.week}`,
+}),
+}).then(r => r.json());
+if (res?.id) setEventIds(prev => ({ ...prev, [w.week]: res.id }));
+}
+
+
+async function removeWeekFromCalendar(weekNum: number) {
+const id = eventIds[weekNum];
+if (!id) return;
+await fetch(`/api/google/events?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+setEventIds(prev => { const { [weekNum]: _, ...rest } = prev; return rest; });
+}
+
+
+useEffect(() => {
+(async () => {
+try {
+const s = await fetch("/api/google/status", { cache: "no-store" }).then(r => r.json());
+setGStatus(s);
+} catch { setGStatus({ connected: false }); }
+})();
+}, []);
+
+
+async function connectGoogle() {
+const { url } = await fetch("/api/google/auth").then(r => r.json());
+window.location.href = url;
+}
+
+
+async function syncAllWeeks() {
+if (!data?.weeks?.length) return;
+const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || process.env.DEFAULT_TZ || "Asia/Singapore";
+const monday = (w: number) => {
+// naive: week N starts N-1 weeks from now on Monday 7pm local, 2h duration — customize!
+const now = new Date();
+const monday = new Date(now);
+monday.setDate(now.getDate() + (1 - now.getDay() + 7) % 7 + (w - 1) * 7); // next Monday + (w-1)*7
+monday.setHours(19, 0, 0, 0);
+const end = new Date(monday); end.setHours(monday.getHours() + 2);
+return { start: monday, end };
+};
+
+
+for (const w of data.weeks) {
+const { start, end } = monday(w.week);
+await fetch("/api/google/events", {
+method: "POST",
+headers: { "Content-Type": "application/json" },
+body: JSON.stringify({
+title: `Week ${w.week}: ${w.title}`,
+description: `Focus: ${(w.focusSkills||[]).join(", ")}`,
+startISO: start.toISOString(),
+endISO: end.toISOString(),
+timezone: tz,
+idempotencyKey: `weekplan-${selectedRole}-${w.week}`,
+}),
+});
+}
+alert("Synced to Google Calendar");
+}
   const perWeek = clamp(Math.round(localHours), 4, 20);
 
   useEffect(() => setLocalHours(hoursProp), [hoursProp]);
@@ -163,6 +246,19 @@ const [compact, setCompact] = useState(true);
           }}
         />
       </div>
+      <div className="flex items-center gap-2">
+        {gStatus?.connected ? (
+        <button
+        className="rounded border px-2 py-1 text-xs hover:bg-gray-50 dark:hover:bg-gray-800"
+        onClick={syncAllWeeks}
+        >Sync all to Google Calendar</button>
+        ) : (
+        <button
+        className="rounded border px-2 py-1 text-xs hover:bg-gray-50 dark:hover:bg-gray-800"
+        onClick={connectGoogle}
+        >Connect Google Calendar</button>
+        )}
+        </div>
     </div>
   </div>
 
@@ -204,9 +300,11 @@ const [compact, setCompact] = useState(true);
                     <ul className="divide-y px-3 dark:divide-gray-800">
                       {items.map((w) => (
                         <li key={w.week} className="flex items-start gap-3 p-3 text-sm min-w-0">
+                          
                         <div className="mt-0.5 h-6 w-6 shrink-0 border text-center text-xs font-semibold leading-6 dark:border-gray-700">
                           {w.week}
                         </div>
+                        
 
                         <div className="min-w-0 flex-1">
                           <div className="font-medium break-words">{w.title}</div>
@@ -259,6 +357,15 @@ const [compact, setCompact] = useState(true);
                             </div>
                           )}
                         </div>
+                        {gStatus?.connected && (
+                            <div className="mt-2 flex gap-2">
+                            {eventIds[w.week] ? (
+                            <button className="rounded border px-2 py-1 text-[11px]" onClick={() => removeWeekFromCalendar(w.week)}>Remove from Calendar</button>
+                            ) : (
+                            <button className="rounded border px-2 py-1 text-[11px]" onClick={() => addWeekToCalendar(w)}>Add to Calendar</button>
+                            )}
+                            </div>
+                            )}
                       </li>
                     ))}
                   </ul>

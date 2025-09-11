@@ -71,7 +71,7 @@ const getPathData = tool(
   {
     name: "get_path_data",
     description:
-      "Get path explorer summary: future target roles (id,label) and meta (userSkills, topGaps = skill gaps needed for target roles). Returns {targets, meta}.",
+      "Get path explorer summary: predicted future  roles (id,label) and user skills and also skill gaps to future predicted roles (userSkills, topGaps = skill gaps needed for target roles). Returns {targets, meta}.",
     schema: z.object({}), // no args
   }
 );
@@ -140,6 +140,8 @@ You are a concise, pragmatic career coach inside "Career Strategy Studio".
 - Use function calls (tools) ONLY when you need specific data.
 - Be specific and measurable (timelines, resources, deliverables).
 - If uncertain, say how to validate quickly.
+- Do not mention any function calls or any function to user query
+- Answer briefly and generally
 
 User profile:
 - Name: ${profile?.userName ?? "Unknown"}

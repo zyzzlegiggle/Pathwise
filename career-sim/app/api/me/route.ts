@@ -1,24 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { verifyJwt } from "@/lib/auth";
+import { getUserFromRequest } from "@/lib/current-user";
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
-    // @ts-ignore - NextRequest is compatible here if you prefer it
-    const token = (req as any).cookies?.get?.("auth_token")?.value 
-      ?? (globalThis as any).__EDGE_PREV?.cookies?.get?.("auth_token")?.value;
-
-    // If the above looks odd in your runtime, use NextRequest instead:
-    // export async function GET(req: NextRequest) { const token = req.cookies.get("auth_token")?.value; }
-
-    // Simpler & reliable version if you switch to NextRequest:
-    // import { NextRequest } from "next/server";
-    // export async function GET(req: NextRequest) { const token = req.cookies.get("auth_token")?.value; }
-
-    if (!token) return NextResponse.json({ user: null }, { status: 200 });
-
-    const payload = await verifyJwt(token);
-    const user = { id: String(payload.sub), email: payload.email, name: payload.name };
-    return NextResponse.json({ user });
+    const user = await getUserFromRequest(req);
+    return NextResponse.json({ user }, { status: 200 });
   } catch {
     return NextResponse.json({ user: null }, { status: 200 });
   }
