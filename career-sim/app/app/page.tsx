@@ -63,44 +63,55 @@ export default function CareerAgentUI() {
     })();
   }, []);
   useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch("/api/me", { cache: "no-store" });
-        const { user } = await res.json();
-        setMe(user ?? null);
-      } catch {}
-    })();
-  }, []);
-  // Bootstrap profile from server when logged in
-  useEffect(() => {
-    (async () => {
-      if (!me) { setBootstrapping(false); return; }
-      try {
-        const res = await fetch("/api/profile", { cache: "no-store" });
-        if (res.status === 204) {
-          // no profile yet -> show onboarding
-          setProfile(null);
-        } else if (res.ok) {
-          const data = await res.json();
-          // Map API -> your UserProfile type
-          setProfile({
-            userName: data.userName ?? "",
-            resume: data.resume ?? "",
-            yearsExp: data.yearsExperience ?? 0,
-            skills: Array.isArray(data.skills) ? data.skills : [],
-            education: data.education ?? "",
-          });
-        } else {
-          // fallback to onboarding if something went wrong
-          setProfile(null);
+      let cancelled = false;
+
+      (async () => {
+        setBootstrapping(true);
+        try {
+          // 1) Who am I?
+          const meRes = await fetch("/api/me", { cache: "no-store" }).catch(() => null);
+          const meJson = meRes && meRes.ok ? await meRes.json() : { user: null };
+          const user = meJson?.user ?? null;
+          if (cancelled) return;
+
+          setMe(user);
+
+          // 2) If logged in, load profile
+          if (user) {
+            try {
+              const profRes = await fetch("/api/profile", { cache: "no-store" });
+              if (cancelled) return;
+
+              if (profRes.status === 204) {
+                // new user—no profile yet
+                setProfile(null);
+              } else if (profRes.ok) {
+                const data = await profRes.json();
+                if (cancelled) return;
+                setProfile({
+                  userName: data.userName ?? "",
+                  resume: data.resume ?? "",
+                  yearsExp: data.yearsExperience ?? 0,
+                  skills: Array.isArray(data.skills) ? data.skills : [],
+                  education: data.education ?? "",
+                });
+              } else {
+                setProfile(null);
+              }
+            } catch {
+              if (!cancelled) setProfile(null);
+            }
+          } else {
+            // not logged in — no profile to show
+            setProfile(null);
+          }
+        } finally {
+          if (!cancelled) setBootstrapping(false);
         }
-      } catch {
-        setProfile(null);
-      } finally {
-        setBootstrapping(false);
-      }
-    })();
-  }, [me]);
+      })();
+
+      return () => { cancelled = true; };
+    }, []);
 // Load the data for components
   useEffect(() => {
     if (!profile || !location) return;
@@ -144,20 +155,23 @@ export default function CareerAgentUI() {
   }
 }, [pathData, push]);
 
- 
-  if (bootstrapping) {
+ if (bootstrapping || me === undefined) {
     return (
       <div className="min-h-screen grid place-items-center">
         <div className="text-sm text-gray-500">Loading…</div>
       </div>
     );
   }
-  if (!profile) {
-    return <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white p-5 dark:from-gray-950 dark:to-gray-900">
-      <div className="animate-fadeIn">
-       <OnboardingForm onComplete={(p) => { setProfile(p); }} />
+
+  // If logged in but has no profile yet → Onboarding
+  if (me && !profile) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white p-5 dark:from-gray-950 dark:to-gray-900">
+        <div className="animate-fadeIn">
+          <OnboardingForm onComplete={(p) => { setProfile(p); }} />
+        </div>
       </div>
-    </div>;
+    );
   }
 
    
