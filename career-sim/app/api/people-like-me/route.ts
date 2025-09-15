@@ -1,20 +1,89 @@
-
 import { NextRequest, NextResponse } from "next/server";
 import { Type } from "@google/genai";
 import { structuredOutput, structuredConfig } from "@/lib/llm";
-import type { UserProfile } from "@/types/user-profile";
 import { prisma } from "@/lib/db";
 
-
-export type SimilarPerson = {
-  name: string;            // e.g., "A., 26" (anonymized initial + age if provided by model)
-  from: string;            // prior role/title
-  to: string;              // new role/title
-  time: string;            // duration, e.g., "5 months"
-  pay: string;             // compact pay summary, e.g., "$38k → $48k"
-  note?: string;           // short tactic, e.g., "Portfolio + referral"
-  sources?: { label: string; url?: string }[]; // optional
+export type TablePerson = {
+  name: string;
+  title?: string;
+  workplace?: string;
+  location?: string;
+  connections?: number;
+  followers?: number;
+  topSkills?: string[];
+  blurb?: string; // short 1-liner from about/experiences/LLM
+  sources?: { label: string; url?: string }[];
 };
+
+function pluckSkillValues(skillsJson: any): string[] {
+  if (!skillsJson) return [];
+  try {
+    const obj = typeof skillsJson === "string" ? JSON.parse(skillsJson) : skillsJson;
+    if (Array.isArray(obj)) return obj.map(String).filter(Boolean);
+    if (obj && typeof obj === "object") {
+      // dataset shape: {'Skill 0': 'Social media', ...}
+      return Object.keys(obj)
+        .sort((a, b) => String(a).localeCompare(String(b)))
+        .map(k => obj[k])
+        .filter(Boolean)
+        .map(String);
+    }
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+function firstExperienceLine(expsJson: any): string {
+  try {
+    const obj = typeof expsJson === "string" ? JSON.parse(expsJson) : expsJson;
+    if (!obj || typeof obj !== "object") return "";
+    const keys = Object.keys(obj).sort((a, b) => String(a).localeCompare(String(b)));
+    for (const k of keys) {
+      const it = obj[k];
+      if (it && typeof it === "object") {
+        const role = (it.Role || it.role || "").toString().trim();
+        const wp = (it.Workplace || it.workplace || "").toString().trim();
+        const desc = (it.Description || it.description || "").toString().trim();
+        const seg = [role, wp, desc].filter(Boolean).join(" | ");
+        if (seg) return seg;
+      } else if (typeof it === "string" && it.trim()) {
+        return it.trim();
+      }
+    }
+    return "";
+  } catch {
+    return "";
+  }
+}
+
+async function llmBlurb(about?: string | null, experienceLine?: string | null): Promise<string | undefined> {
+  const text = [about && `About: ${about}`, experienceLine && `Experience: ${experienceLine}`]
+    .filter(Boolean)
+    .join("\n");
+  if (!text) return undefined;
+
+  const config: structuredConfig = {
+    responseMimeType: "application/json",
+    responseSchema: {
+      type: Type.OBJECT,
+      properties: { blurb: { type: Type.STRING } },
+      required: ["blurb"],
+      propertyOrdering: ["blurb"]
+    }
+  };
+
+  try {
+    const out = await structuredOutput(
+      `Write a single, short, concrete line (max 18 words) summarizing this person's professional focus:\n${text}`,
+      config
+    );
+    const val = (out as any)?.blurb?.toString()?.trim();
+    return val || undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -26,28 +95,48 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing required: userId" }, { status: 400 });
     }
 
-    // Build optional role filter
+    // Ensure user has an embedding
+    const userVec = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT resume_embedding FROM user_profile WHERE user_id = ?`,
+      BigInt(userId as any)
+    );
+    if (!Array.isArray(userVec) || userVec[0]?.resume_embedding == null) {
+      return NextResponse.json({ people: [], warning: "User has no resume embedding yet." });
+    }
+
+    // role hints prefilter
     const roleHints = (targets ?? []).map(t => t.label).slice(0, 4);
-    const whereClause = roleHints.length
-      ? "WHERE " + roleHints.map(() => "p.to_role LIKE ?").join(" OR ")
-      : "";
-    const whereParams = roleHints.map(h => `%${h}%`);
+    const likeClauses: string[] = [];
+    const likeParams: string[] = [];
+    if (roleHints.length) {
+      for (const _ of roleHints) {
+        likeClauses.push(
+          `(p.current_title LIKE ? OR p.workplace LIKE ? OR JSON_SEARCH(p.skills, 'all', ?) IS NOT NULL OR JSON_SEARCH(p.experiences, 'all', ?) IS NOT NULL)`
+        );
+      }
+      for (const h of roleHints) {
+        const pat = `%${h}%`;
+        likeParams.push(pat, pat, pat, pat);
+      }
+    }
+    const whereClause = likeClauses.length ? `WHERE ${likeClauses.join(" OR ")}` : "";
 
-    // Choose your distance: L2_DISTANCE or COSINE_DISTANCE
-    const distanceFn = "VEC_COSINE_DISTANCE"; // or "COSINE_DISTANCE" if you store normalized vectors
+    // Distance fn/operator name may differ by distro; update if needed
+    const distanceFn = `VEC_COSINE_DISTANCE`;
 
-    // Single raw SQL: subquery pulls the candidate's embedding from user_profile
     const rows = await prisma.$queryRawUnsafe<any[]>(
       `
       SELECT
-        p.name,
-        p.from_role,
-        p.to_role,
-        p.time_to_offer,
-        p.pay_from,
-        p.pay_to,
-        p.currency,
-        p.note,
+        p.full_name,
+        p.current_title,
+        p.workplace,
+        p.location,
+        p.connections,
+        p.followers,
+        p.skills,
+        p.about,
+        p.experiences,
+        p.resume_summary,
         p.sources
       FROM people p
       ${whereClause}
@@ -55,30 +144,42 @@ export async function POST(req: NextRequest) {
         p.resume_embedding,
         (SELECT up.resume_embedding FROM user_profile up WHERE up.user_id = ?)
       ) ASC
-      LIMIT 6
+      LIMIT 12
       `,
-      ...whereParams,
+      ...likeParams,
       BigInt(userId as any)
     );
 
-    const people: SimilarPerson[] = (rows ?? []).map((r) => {
-      const format = (n: number, cur: string) =>
-        new Intl.NumberFormat("en", { style: "currency", currency: cur, maximumFractionDigits: 0 }).format(n);
+    const people: TablePerson[] = [];
+    for (const r of rows ?? []) {
+      const skills = pluckSkillValues(r.skills).slice(0, 6);
+      const expLine = firstExperienceLine(r.experiences);
+      // choose best blurb: resume_summary > about > experience > llm
+      const blurbBase: string | undefined =
+        (r.resume_summary && String(r.resume_summary)) ||
+        (r.about && String(r.about)) ||
+        (expLine || undefined);
 
-      const currency = r.currency || "USD";
-      const pay =
-        r.pay_from && r.pay_to ? `${format(r.pay_from, currency)} → ${format(r.pay_to, currency)}` : "—";
+      const blurb =
+        blurbBase && blurbBase.length <= 160
+          ? blurbBase
+          : await llmBlurb(r.about, expLine);
 
-      return {
-        name: String(r.name ?? "Anon"),
-        from: String(r.from_role ?? ""),
-        to: String(r.to_role ?? ""),
-        time: String(r.time_to_offer ?? "—"),
-        pay,
-        note: r.note ? String(r.note) : undefined,
-        sources: Array.isArray(r.sources) ? r.sources : undefined,
-      };
-    });
+      const fullName =
+  (r.full_name && String(r.full_name).trim()) || "Anon";
+
+people.push({
+  name: fullName,
+  title: r.current_title ? String(r.current_title) : undefined,
+  workplace: r.workplace ? String(r.workplace) : undefined,
+  location: r.location ? String(r.location) : undefined,
+  connections: typeof r.connections === "number" ? r.connections : undefined,
+  followers: typeof r.followers === "number" ? r.followers : undefined,
+  topSkills: skills,
+  blurb,
+  sources: Array.isArray(r.sources) ? r.sources : undefined
+});
+    }
 
     return NextResponse.json({ people });
   } catch (e: any) {

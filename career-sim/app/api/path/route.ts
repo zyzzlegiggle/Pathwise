@@ -159,42 +159,53 @@ function diff(required: string[], have: string[]) {
 const CONF_THRESHOLD_COURSE = 0.45;
 const CONF_THRESHOLD_PROJECT = 0.40;
 
-async function webCoursesFor(skill: string, limit = 2): Promise<ResourceLite[]> {
-  const urls = await serpSearchUrls(courseQuery(skill), 8);
-  const snaps = (await Promise.all(urls.map(fetchSnapshot))).filter(Boolean) as any[];
-  const extracted = await Promise.all(snaps.map(s => extractCourse(s, skill)));
-  // dedupe by normalized URL/title, sort by confidence desc
-  const norm = (u?: string) => (u ? u.replace(/[#?].*$/, "").replace(/\/$/, "") : "");
+async function extractTopByConfidence<T extends ResourceLite>(
+  urls: string[],
+  extractor: (snap: any) => Promise<T>,
+  minConf: number,
+  limit: number
+): Promise<T[]> {
   const seen = new Set<string>();
-  const dedup = extracted
-    .sort((a, b) => b._confidence - a._confidence)
-    .filter(e => {
-      const key = norm(e.url) || e.title;
-      if (!key || seen.has(key)) return false;
-      seen.add(key);
-      return e._confidence >= CONF_THRESHOLD_COURSE;
-    })
-    .slice(0, limit);
-  return dedup;
+  const out: T[] = [];
+
+  const normUrl = (u?: string) => (u ? u.replace(/[#?].*$/, "").replace(/\/$/, "") : "");
+
+  // process in batches of 2 for quicker early wins
+  const batchSize = 2;
+  for (let i = 0; i < urls.length && out.length < limit; i += batchSize) {
+    const slice = urls.slice(i, i + batchSize);
+    const snaps = (await Promise.all(slice.map(fetchSnapshot))).filter(Boolean) as any[];
+    const extracted = await Promise.all(snaps.map(extractor));
+
+    for (const e of extracted) {
+      const key = normUrl((e as any).url) || (e as any).title;
+      if (!key || seen.has(key)) continue;
+      if ((e as any)._confidence >= minConf) {
+        seen.add(key);
+        out.push(e);
+        if (out.length >= limit) break; // early stop
+      }
+    }
+  }
+  return out;
+}
+
+// api/path route.ts
+async function webCoursesFor(skill: string, limit = 2): Promise<ResourceLite[]> {
+  const want = Math.max(2, Math.min(6, limit * 3)); // usually 3–6
+  const urls = await serpSearchUrls(courseQuery(skill), want);
+  return extractTopByConfidence(urls, (s) => extractCourse(s, skill), CONF_THRESHOLD_COURSE, limit);
 }
 
 async function webProjectsFor(skill: string, limit = 2): Promise<ResourceLite[]> {
-  const urls = await serpSearchUrls(projectQuery(skill), 8);
-  const snaps = (await Promise.all(urls.map(fetchSnapshot))).filter(Boolean) as any[];
-  const extracted = await Promise.all(snaps.map(s => extractProject(s, skill)));
-  const norm = (u?: string) => (u ? u.replace(/[#?].*$/, "").replace(/\/$/, "") : "");
-  const seen = new Set<string>();
-  const dedup = extracted
-    .sort((a, b) => b._confidence - a._confidence)
-    .filter(e => {
-      const key = norm(e.url) || e.title;
-      if (!key || seen.has(key)) return false;
-      seen.add(key);
-      return e._confidence >= CONF_THRESHOLD_PROJECT;
-    })
-    .slice(0, limit);
-  return dedup;
+  const want = Math.max(2, Math.min(6, limit * 3));
+  const urls = await serpSearchUrls(projectQuery(skill), want);
+  return extractTopByConfidence(urls, (s) => extractProject(s, skill), CONF_THRESHOLD_PROJECT, limit);
 }
+
+
+// api/path route.ts
+const resourceCache = new Map<string, Promise<ResourceLite[]>>();
 
 async function resourcesForGaps(
   gaps: string[],
@@ -204,19 +215,16 @@ async function resourcesForGaps(
   if (gaps.length === 0) return [];
   const out: ResourceLite[] = [];
   for (const g of gaps) {
-    const items = kind === "learn" ? await webCoursesFor(g, limitPerSkill)
-                                   : await webProjectsFor(g, limitPerSkill);
-    out.push(...items);
-  }
-  if (out.length === 0) {
-    // fallback placeholders (your original behavior)
-    let i = 0;
-    return kind === "learn"
-      ? []
-      : []
+    const key = `${kind}:${g}:${limitPerSkill}`;
+    const promise = resourceCache.get(key) ?? (kind === "learn"
+      ? webCoursesFor(g, limitPerSkill)
+      : webProjectsFor(g, limitPerSkill));
+    resourceCache.set(key, promise);
+    out.push(...await promise);
   }
   return out;
 }
+
 
 export async function POST(req: NextRequest) {
   try {
@@ -285,7 +293,7 @@ export async function POST(req: NextRequest) {
     }
     const topGaps = Array.from(gapCounter.entries())
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
+      .slice(0, 3) // was 5
       .map(([g]) => g);
 
     // 4) resources for bridges (unchanged)

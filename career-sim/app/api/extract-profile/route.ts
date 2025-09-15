@@ -172,27 +172,97 @@ Return a strict JSON object adhering to the provided schema. Use integers for ye
   }
 }
 
+function sanitizeResume(raw: string): string {
+  // strip nulls and trim whitespace
+  let s = raw.replace(/\0/g, " ").trim();
+
+  // strip basic HTML tags if someone pasted from a rich editor
+  s = s.replace(/<[^>]*>/g, " ");
+
+  // collapse runs of whitespace
+  s = s.replace(/\s{2,}/g, " ");
+
+  return s;
+}
+
+// --- NEW: validation guard for background text ---
+function validateResumeText(raw: string): { ok: true } | { ok: false; reason: string } {
+  const text = sanitizeResume(raw);
+
+  // Hard limits
+  const minChars = 200;         // require at least a short paragraph or two
+  const maxChars = 20_000;      // prevent huge payloads
+
+  if (text.length < minChars) {
+    return { ok: false, reason: `Please provide more detail (at least ${minChars} characters).` };
+  }
+  if (text.length > maxChars) {
+    return { ok: false, reason: `Too long (>${maxChars.toLocaleString()} chars). Please trim the content.` };
+  }
+
+  // Reject link-only or mostly-link content
+  const looksLikeUrlOnly =
+    /^(https?:\/\/|www\.)\S+$/i.test(text) ||
+    // 85%+ non-space characters are part of a single URL-ish token
+    (() => {
+      const noSpaces = text.replace(/\s/g, "");
+      const urlish = text.match(/https?:\/\/\S+|www\.\S+/gi)?.join("") ?? "";
+      return urlish.length > 0 && urlish.length / noSpaces.length >= 0.85;
+    })();
+  if (looksLikeUrlOnly) {
+    return { ok: false, reason: "Please paste the *text* of your background instead of only a link." };
+  }
+
+  // Must contain letters and at least a few words
+  const letterCount = (text.match(/[A-Za-z]/g) || []).length;
+  const wordCount = (text.match(/\b\w+\b/g) || []).length;
+  if (letterCount < 50 || wordCount < 30) {
+    return { ok: false, reason: "That looks too short or non-text. Add more detail about roles, skills, and education." };
+  }
+
+  // Very repetitive / gibberish guard (e.g., spammy characters)
+  const topCharRun = (() => {
+    let maxRun = 1, run = 1;
+    for (let i = 1; i < text.length; i++) {
+      run = text[i] === text[i - 1] ? run + 1 : 1;
+      if (run > maxRun) maxRun = run;
+    }
+    return maxRun;
+  })();
+  if (topCharRun > 50) {
+    return { ok: false, reason: "Input looks malformed (very repetitive characters). Please type plain text." };
+  }
+
+  return { ok: true };
+}
 
 export async function POST(req: NextRequest) {
-  const { text } = await req.json();         
-  if (typeof text !== "string" || !text.trim()) {
+  const body = await req.json().catch(() => null);
+  const rawText = body?.text;
+  if (typeof rawText !== "string" || !rawText.trim()) {
     return NextResponse.json({ error: "Missing text" }, { status: 400 });
   }
+
+  // --- NEW: validate early ---
+  const check = validateResumeText(rawText);
+  if (!check.ok) {
+    return NextResponse.json({ error: check.reason }, { status: 400 });
+  }
+
+  const text = sanitizeResume(rawText);
 
   try {
     const token = req.cookies.get("auth_token")?.value;
     if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const payload = await verifyJwt(token);
-    const sub = payload.sub;                 
-    const userId = BigInt(sub as string);     
+    const userId = BigInt(String(payload.sub));
 
     const extracted = await llmExtract(text);
     await ingestProfile(userId, text, extracted);
 
-    // return only extracted fields (no BigInt in payload)
     return NextResponse.json(extracted);
   } catch (e: any) {
-    return NextResponse.json({ error: e.message || "Failed to extract" }, { status: 500 });
+    return NextResponse.json({ error: e?.message || "Failed to extract" }, { status: 500 });
   }
 }

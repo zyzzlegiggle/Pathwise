@@ -4,7 +4,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY! });
 const EMBEDDING_MODEL = "gemini-embedding-001";
 const TEXT_MODEL = "gemini-2.5-flash";
-const DIM   = 768; // match your TiDB column
+const DIM   = 384; // match your TiDB column
 
 function l2norm(v: number[]) {
   const arr = Array.from(v); // ensure iterable

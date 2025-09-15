@@ -1,23 +1,20 @@
-// app/components/system/SessionProvider.tsx
+// session-provider.tsx
 'use client';
-import {createContext, useContext } from "react";
+import { createContext, useContext, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
 
-
-const Ctx = createContext("")
-
+const Ctx = createContext("");
 
 export function SessionProvider({ threadId, children }: { threadId?: string; children: React.ReactNode }) {
- 
-  const id = threadId || uuidv4();
-  return <Ctx.Provider value={id}>{children}</Ctx.Provider>;
+  // Persist a stable id for the lifetime of this provider
+  const ref = useRef(threadId ?? uuidv4());
+  return <Ctx.Provider value={ref.current}>{children}</Ctx.Provider>;
 }
 
 export function useThreadId() {
   return useContext(Ctx);
 }
 
-// Minimal push helper
 export function usePushData() {
   const threadId = useThreadId();
   return async (key: string, value: unknown) => {

@@ -127,33 +127,8 @@ export default function CareerAgentUI() {
     return () => {
       cancelled = true;
     };
-  }, [profile, location]);
+  }, [profile,location]);
 
-  useEffect(() => {
-  if (!pathData) return;
-
-  // sanitize to only what chat needs
-  const payload = {
-    targets: (Array.isArray(pathData.targets) ? pathData.targets : []).map(t => ({
-      id: String(t.id ?? ""),
-      label: String(t.label ?? ""),
-    })),
-    meta: {
-      userSkills: Array.isArray(pathData.meta?.userSkills) ? pathData.meta!.userSkills.map(String) : [],
-      topGaps: Array.isArray(pathData.meta?.topGaps) ? pathData.meta!.topGaps.map(String) : [],
-    },
-  };
-
-  // only push if we actually have targets or topGaps/userSkills
-  const hasUseful =
-    (payload.targets.length > 0) ||
-    (payload.meta.userSkills.length > 0) ||
-    (payload.meta.topGaps.length > 0);
-
-  if (hasUseful) {
-    push("pathData", payload).catch(() => {});
-  }
-}, [pathData, push]);
 
  if (bootstrapping || me === undefined) {
     return (

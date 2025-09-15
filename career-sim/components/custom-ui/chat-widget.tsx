@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Send, Loader2, Sparkles, Trash2 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { UserProfile } from '@/types/user-profile';
+import { useThreadId } from '../system/session-provider';
 
 type ChatRole = 'user' | 'assistant';
 
@@ -26,7 +27,7 @@ export function ChatWidget({ profile, variant='default', threadId: threadIdProp 
   const [loading, setLoading] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   console.log(threadIdProp)
-  const [threadId] = useState(() => threadIdProp || uuidv4());
+  const threadId = useThreadId();
 
   const scrollToBottom = useCallback(() => {
     if (!listRef.current) return;

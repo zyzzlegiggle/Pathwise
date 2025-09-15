@@ -4,6 +4,7 @@ import { UserProfile } from "@prisma/client";
 import { useMemo, useState, useEffect } from "react";
 import ReactFlow, { Background, Controls, MiniMap } from "reactflow";
 import { Modal } from "./modal";
+import { usePushData } from "../system/session-provider";
 
 const nodeBase =
   "rounded-xl border bg-white px-3 py-2 text-sm shadow-sm dark:border-gray-800 dark:bg-gray-900";
@@ -24,6 +25,20 @@ function toPathApiProfile(p: UIUserProfile| DbUserProfile): PathApiProfile {
     education: p.education ?? null,
   };
 }
+// add these small helpers near the top of the file
+function SectionSkeleton() {
+  return (
+    <ul className="grid grid-cols-1 gap-2 animate-pulse">
+      {[0,1,2].map(i => (
+        <li key={i} className="rounded-lg border p-2 text-xs dark:border-gray-800">
+          <div className="h-4 w-3/4 rounded bg-gray-100 dark:bg-gray-800" />
+          <div className="mt-2 h-3 w-1/2 rounded bg-gray-100 dark:bg-gray-800" />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 
 export async function fetchPathExplorerData(
   profile: UIUserProfile | DbUserProfile
@@ -90,7 +105,7 @@ export function PathExplorer({ data }: { planMode?: string; data?: PathExplorerD
   const [showAllFoundational, setShowAllFoundational] = useState(false);
   const [showAllPortfolio, setShowAllPortfolio] = useState(false);
   const [loading, setLoading] = useState(false);
-
+const push = usePushData();
   useEffect(() => {
     if (!data) {
       setLoading(true);
@@ -99,6 +114,29 @@ export function PathExplorer({ data }: { planMode?: string; data?: PathExplorerD
       return () => clearTimeout(t);
     }
   }, [data]);
+
+   // NEW: push pathData here whenever it changes
+useEffect(() => {
+  if (!data) return;
+
+  const run = async () => {
+    const payload = {
+      targets: data.targets,
+      bridges: data.bridges,
+      edges: data.edges,
+      courses: data.courses,
+      projects: data.projects,
+    };
+    try {
+      await push("pathData", payload);
+    } catch (e) {
+      console.error("Failed to push pathData", e);
+    }
+  };
+
+  run();
+}, [data, push]);
+
 
    
 
@@ -181,67 +219,160 @@ export function PathExplorer({ data }: { planMode?: string; data?: PathExplorerD
 
       {/* two compact resource strips (max 3 each) */}
       <div className="grid gap-4 p-3 md:grid-cols-2">
+        {/* Learn foundational skills */}
         <section className="space-y-2">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold">Learn foundational skills</h3>
-            {foundational.length > 3 && (
-<button onClick={() => setShowAllFoundational(true)} className="text-xs underline underline-offset-2 transition hover:opacity-80">View all</button>            )}
+            {loading && ( // tiny inline “loading” indicator near the header
+              <span className="text-[11px] text-gray-500 animate-pulse">loading…</span>
+            )}
+            {!loading && foundational.length > 3 && (
+              <button
+                onClick={() => setShowAllFoundational(true)}
+                className="text-xs underline underline-offset-2 transition hover:opacity-80"
+              >
+                View all
+              </button>
+            )}
           </div>
-          <ul className="grid grid-cols-1 gap-2">
-            {foundational.slice(0, 3).map(r => (
-              <li key={r.id} className="rounded-lg border p-2 text-xs dark:border-gray-800">
-                <div className="line-clamp-1 font-medium">
-                  {r.url ? <a className="underline" href={r.url} target="_blank" rel="noreferrer">{r.title}</a> : r.title}
-                </div>
-                <div className="mt-1 text-[11px] text-gray-500">
-                  {r.provider ?? "—"} · {r.hours ? `${r.hours}h` : "self-paced"} · {r.cost ? `≈$${r.cost}` : "free"}
-                </div>
-              </li>
-            ))}
-            {foundational.length === 0 && <li className="text-xs text-gray-500">No modules yet </li>}
-          </ul>
+
+          {loading && foundational.length === 0 ? (
+            <SectionSkeleton />
+          ) : (
+            <ul className="grid grid-cols-1 gap-2">
+              {foundational.slice(0, 3).map(r => (
+                <li
+                  key={r.id}
+                  className="rounded-lg border text-xs dark:border-gray-800 transition hover:bg-gray-50 hover:-translate-y-[1px] dark:hover:bg-gray-800"
+                >
+                  {r.url ? (
+                    <a
+                      className="block p-2 cursor-pointer"
+                      href={r.url}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                    >
+                      <div className="line-clamp-1 font-medium underline underline-offset-2">
+                        {r.title}
+                      </div>
+                      <div className="mt-1 text-[11px] text-gray-500">
+                        {r.provider ?? "—"} · {r.hours ? `${r.hours}h` : "self-paced"} ·{" "}
+                        {r.cost ? `≈$${r.cost}` : "free"}
+                      </div>
+                    </a>
+                  ) : (
+                    <div className="p-2">
+                      <div className="line-clamp-1 font-medium">{r.title}</div>
+                      <div className="mt-1 text-[11px] text-gray-500">
+                        {r.provider ?? "—"} · {r.hours ? `${r.hours}h` : "self-paced"} ·{" "}
+                        {r.cost ? `≈$${r.cost}` : "free"}
+                      </div>
+                    </div>
+                  )}
+                </li>
+
+              ))}
+              {!loading && foundational.length === 0 && (
+                <li className="text-xs text-gray-500">No modules yet</li>
+              )}
+            </ul>
+          )}
         </section>
 
+        {/* Practice your skills */}
         <section className="space-y-2">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold">Practice your skills</h3>
-            {portfolio.length > 3 && (
-              <button onClick={() => setShowAllPortfolio(true)} className="text-xs underline">View all</button>
+            {loading && <span className="text-[11px] text-gray-500 animate-pulse">loading…</span>}
+            {!loading && portfolio.length > 3 && (
+              <button onClick={() => setShowAllPortfolio(true)} className="text-xs underline">
+                View all
+              </button>
             )}
           </div>
-          <ul className="grid grid-cols-1 gap-2">
-            {portfolio.slice(0, 3).map(r => (
-              <li key={r.id} className="rounded-lg border p-2 text-xs dark:border-gray-800">
-                <div className="line-clamp-1 font-medium">{r.title}</div>
-                <div className="mt-1 text-[11px] text-gray-500">
-                  {r.provider ?? "—"} · {r.hours ? `${r.hours}h` : "weekend project"} · {r.cost ? `≈$${r.cost}` : "free"}
-                </div>
-              </li>
-            ))}
-            {portfolio.length === 0 && <li className="text-xs text-gray-500">No projects yet</li>}
-          </ul>
+
+          {loading && portfolio.length === 0 ? (
+            <SectionSkeleton />
+          ) : (
+            <ul className="grid grid-cols-1 gap-2">
+              {portfolio.slice(0, 3).map(r => (
+                <li
+                  key={r.id}
+                  className="rounded-lg border text-xs dark:border-gray-800 transition hover:bg-gray-50 hover:-translate-y-[1px] dark:hover:bg-gray-800"
+                >
+                  {r.url ? (
+                    <a
+                      className="block p-2 cursor-pointer"
+                      href={r.url}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      aria-label={`Open ${r.title}`}
+                    >
+                      <div className="line-clamp-1 font-medium underline underline-offset-2">
+                        {r.title}
+                      </div>
+                      <div className="mt-1 text-[11px] text-gray-500">
+                        {r.provider ?? "—"} · {r.hours ? `${r.hours}h` : "weekend project"} · {r.cost ? `≈$${r.cost}` : "free"}
+                      </div>
+                    </a>
+                  ) : (
+                    <div className="p-2">
+                      <div className="line-clamp-1 font-medium">{r.title}</div>
+                      <div className="mt-1 text-[11px] text-gray-500">
+                        {r.provider ?? "—"} · {r.hours ? `${r.hours}h` : "weekend project"} · {r.cost ? `≈$${r.cost}` : "free"}
+                      </div>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+
+          )}
         </section>
       </div>
 
       {/* modals for "View all" */}
       <Modal
-        open={showAllFoundational}
-        onClose={() => setShowAllFoundational(false)}
-        title="All foundational modules"
+        open={showAllPortfolio}
+        onClose={() => setShowAllPortfolio(false)}
+        title="All portfolio & practice projects"
       >
         <ul className="space-y-2">
-          {foundational.map(r => (
-            <li key={r.id} className="rounded-lg border p-2 text-xs dark:border-gray-800">
-              <div className="font-medium">
-                {r.url ? <a className="underline" href={r.url} target="_blank" rel="noreferrer">{r.title}</a> : r.title}
+          {portfolio.map(r => (
+          <li
+            key={r.id}
+            className="rounded-lg border text-xs dark:border-gray-800 transition hover:bg-gray-50 hover:-translate-y-[1px] dark:hover:bg-gray-800"
+          >
+            {r.url ? (
+              <a
+                className="block p-2 cursor-pointer"
+                href={r.url}
+                target="_blank"
+                rel="noreferrer noopener"
+              >
+                <div className="font-medium underline underline-offset-2">
+                  {r.title}
+                </div>
+                <div className="mt-1 text-[11px] text-gray-500">
+                  {r.provider ?? "—"} · {r.hours ? `${r.hours}h` : "weekend project"} ·{" "}
+                  {r.cost ? `≈$${r.cost}` : "free"}
+                </div>
+              </a>
+            ) : (
+              <div className="p-2">
+                <div className="font-medium">{r.title}</div>
+                <div className="mt-1 text-[11px] text-gray-500">
+                  {r.provider ?? "—"} · {r.hours ? `${r.hours}h` : "weekend project"} ·{" "}
+                  {r.cost ? `≈$${r.cost}` : "free"}
+                </div>
               </div>
-              <div className="mt-1 text-[11px] text-gray-500">
-                {r.provider ?? "—"} · {r.hours ? `${r.hours}h` : "self-paced"} · {r.cost ? `≈$${r.cost}` : "free"}
-              </div>
-            </li>
+            )}
+          </li>
+
           ))}
         </ul>
       </Modal>
+
 
       <Modal
         open={showAllPortfolio}
@@ -250,27 +381,36 @@ export function PathExplorer({ data }: { planMode?: string; data?: PathExplorerD
       >
         <ul className="space-y-2">
           {portfolio.map(r => (
-            <li key={r.id} className="rounded-lg border p-2 text-xs dark:border-gray-800">
-            <a className="block" href={r.url!} target="_blank" rel="noreferrer noopener">
-                          <div className="font-medium">
-              {r.url ? (
-                <a
-                  className="underline underline-offset-2"
-                  href={r.url}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                >
+          <li
+            key={r.id}
+            className="rounded-lg border text-xs dark:border-gray-800 transition hover:bg-gray-50 hover:-translate-y-[1px] dark:hover:bg-gray-800"
+          >
+            {r.url ? (
+              <a
+                className="block p-2 cursor-pointer"
+                href={r.url}
+                target="_blank"
+                rel="noreferrer noopener"
+              >
+                <div className="font-medium underline underline-offset-2">
                   {r.title}
-                </a>
-              ) : (
-                r.title
-              )}
-            </div>
-              <div className="mt-1 text-[11px] text-gray-500">
-                {r.provider ?? "—"} · {r.hours ? `${r.hours}h` : "weekend project"} · {r.cost ? `≈$${r.cost}` : "free"}
+                </div>
+                <div className="mt-1 text-[11px] text-gray-500">
+                  {r.provider ?? "—"} · {r.hours ? `${r.hours}h` : "weekend project"} ·{" "}
+                  {r.cost ? `≈$${r.cost}` : "free"}
+                </div>
+              </a>
+            ) : (
+              <div className="p-2">
+                <div className="font-medium">{r.title}</div>
+                <div className="mt-1 text-[11px] text-gray-500">
+                  {r.provider ?? "—"} · {r.hours ? `${r.hours}h` : "weekend project"} ·{" "}
+                  {r.cost ? `≈$${r.cost}` : "free"}
+                </div>
               </div>
-            </a>
-            </li>
+            )}
+          </li>
+
           ))}
         </ul>
       </Modal>

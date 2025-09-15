@@ -23,13 +23,15 @@ const makeCallModel =
     return { messages: response };
   };
 
-// If the last AI message has tool calls, route to "tools"; otherwise END
+const hasToolCalls = (msg: AIMessage) => {
+  const tc1 = (msg as any).tool_calls;
+  const tc2 = (msg as any).additional_kwargs?.tool_calls;
+  return Array.isArray(tc1) ? tc1.length > 0 : Array.isArray(tc2) && tc2.length > 0;
+};
+
 const shouldContinue = (state: typeof MessagesAnnotation.State) => {
   const last = state.messages[state.messages.length - 1];
-  if (last instanceof AIMessage && Array.isArray((last as any).tool_calls) && (last as any).tool_calls.length > 0) {
-    return "tools";
-  }
-  return END;
+  return last instanceof AIMessage && hasToolCalls(last) ? "tools" : END;
 };
 
 type WireMessage = { role: "user" | "assistant" | "system"; content: string };
@@ -52,7 +54,7 @@ export async function POST(req: NextRequest) {
     
 const getPathData = tool(
   async (_: {}): Promise<{ targets: { id: string; label: string }[]; meta: { userSkills: string[]; topGaps: string[] } }> => {
-    const raw: any = (getSessionData(threadId) as any)?.pathData ?? {};
+    const raw: any = (session as any)?.pathData ?? {};
 
     const targets = Array.isArray(raw?.targets)
       ? raw.targets.map((t: any) => ({
@@ -71,14 +73,15 @@ const getPathData = tool(
   {
     name: "get_path_data",
     description:
-      "Get path explorer summary: predicted future  roles (id,label) and user skills and also skill gaps to future predicted roles (userSkills, topGaps = skill gaps needed for target roles). Returns {targets, meta}.",
+      "Get path explorer summary: predicted future  roles (id,label) and user skills and also skill gaps to future predicted roles (userSkills, topGaps = skill gaps needed for target roles). Returns {targets, meta}. This also returns courses and projects (learning resources) that user can do",
     schema: z.object({}), // no args
   }
 );
 
+const session = await getSessionData(threadId) ?? {}; // durable read
 
     const getDecisionDuel = tool(
-      async (_: {}): Promise<unknown> => getSessionData(threadId).decisionDuel ?? {},
+      async (_: {}): Promise<unknown> => session.decisionDuel ?? {},
       {
         name: "get_decision_duel",
         description: "Get comparison between two paths: approaches, metrics, and timeline CDF.",
@@ -87,7 +90,7 @@ const getPathData = tool(
     );
 
     const getTradeoffs = tool(
-      async (_: {}): Promise<unknown> => getSessionData(threadId).tradeoffs ?? [],
+      async (_: {}): Promise<unknown> => session.tradeoffs ?? [],
       {
         name: "get_tradeoffs",
         description: "Get tradeoff items which are items  that will most improve interview chances for THIS candidate/user.",
@@ -96,17 +99,17 @@ const getPathData = tool(
     );
 
     const getPeopleLikeMe = tool(
-      async (_: {}): Promise<unknown> => getSessionData(threadId).peopleLikeMe ?? [],
+      async (_: {}): Promise<unknown> => session.peopleLikeMe ?? [],
       {
         name: "get_people_like_me",
-        description: "Get similar people examples (from→to, time, pay, notes, sources).",
+        description: "Get similar people to user.",
         schema: z.object({}),
       }
     );
 
     const getWeekPlan = tool(
       async ({ phase }: { phase?: string }): Promise<unknown> => {
-        const wp: any = getSessionData(threadId).weekPlan ?? {};
+        const wp: any = session.weekPlan ?? {};
         if (phase && Array.isArray(wp?.phases)) {
           const pm = wp.phases.find((p: any) => p.label === phase);
           const weeks = (wp.weeks ?? []).filter((w: any) => w.week >= pm?.start && w.week <= pm?.end);

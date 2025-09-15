@@ -87,7 +87,7 @@ model JobRole {
   description     String?  @db.MediumText
   requiredSkills  Json?                  // e.g. ["SQL", "React", "Backlog grooming"]
 
-  embedding Unsupported("VECTOR(768)")? // managed via raw SQL migration
+  embedding Unsupported("VECTOR(384)")? // managed via raw SQL migration
 
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
@@ -97,23 +97,50 @@ model JobRole {
 }
 
 model People {
-  person_id         BigInt   @id @default(autoincrement())
-  name              String   @db.VarChar(64)
-  from_role         String   @db.VarChar(128)
-  to_role           String   @db.VarChar(128)
-  time_to_offer     String?  @db.VarChar(32)   // e.g., "5 months"
-  pay_from          Int?                    // e.g., 52000
-  pay_to            Int?
-  currency          String?  @db.Char(3)     // "USD", "SGD", etc.
-  note              String?  @db.VarChar(255)
-  sources           Json?
-  resume_summary    String?  @db.Text
+  person_id       BigInt   @id @default(autoincrement())
 
-  // Native MySQL vector; pick a dim that matches your embedding model
-  //resume_embedding  Unsupported("VECTOR(768)")
+  full_name       String   @db.VarChar(255)
+  current_title   String?  @db.VarChar(1024)
+  workplace       String?  @db.VarChar(1024)
+  location        String?  @db.VarChar(1024)
+  connections     Int?
+  followers       Int?
+  photo           Int?     // 1=yes, 0=no
+  about           String?  @db.MediumText
 
-  created_at        DateTime @default(now())
-  updated_at        DateTime @updatedAt
+  experiences     Json?
+  educations      Json?
+  licenses        Json?
+  volunteering    Json?
+  skills          Json?
+  recommendations Json?
+  projects        Json?
+  publications    Json?
+  courses         Json?
+  honors          Json?
+  scores          Json?
+  languages       Json?
+  organizations   Json?
+  interests       Json?
+  activities      Json?
+
+  label           Int?
+  sources         Json?
+  resume_summary  String?  @db.MediumText
+  resume_embedding Unsupported("VECTOR(384)") // REQUIRED for KNN
+
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
 
   @@map("people")
+}
+
+model SessionData {
+  threadId   String  @id        @map("thread_id")
+  data       Json
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("session_data")
+  @@index([updated_at], name: "idx_session_data_updated_at")
 }

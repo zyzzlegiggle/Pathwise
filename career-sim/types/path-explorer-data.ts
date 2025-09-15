@@ -26,10 +26,12 @@ export type PathEdge = { source: string; target: string };
 export type PathExplorerData = {
   targets: PathTarget[];
   bridges: PathBridge[];
-  edges: PathEdge[];         
+  edges: PathEdge[];
+  courses?: ResourceLite[];   // <- flattened foundational modules
+  projects?: ResourceLite[];  // <- flattened portfolio projects
   meta?: {
     userSkills: string[];
-    topGaps: string[];       
+    topGaps: string[];
   };
 };
 
