@@ -47,12 +47,13 @@ export function DecisionDuel({
   hours,
   location,
   pathTargets,
-  onEvidence,
+  onApproachesChange, 
+  
 }: {
   hours: number;
   location: string;
   pathTargets?: PathTarget[];
-  onEvidence?: (e: EvidenceBuckets) => void;
+  onApproachesChange?: (a: string, b: string) => void; 
 }) {
   if (pathTargets === undefined || pathTargets === null) {
     return (
@@ -106,19 +107,19 @@ export function DecisionDuel({
         });
         if (active) {
           setServer(data);
-          // NEW: bubble evidence up
-          if (data?.evidence) onEvidence?.(data.evidence);
         }
       } catch {
         if (active) setServer(null);
-        // also clear evidence if fetch fails
-        onEvidence?.({ comparableOutcomes: [], alumniStories: [], marketNotes: [] });
       } finally {
        if (active) setIsLoading(false);
       }
     })();
     return () => { active = false; };
   }, [hours, location, targetA, targetB, approachA, approachB, pathTargets]);
+
+  useEffect(() => {
+    onApproachesChange?.(approachA, approachB);
+  }, [approachA, approachB, onApproachesChange]);
   
   useEffect(() => {
     // push only what’s useful to ask about

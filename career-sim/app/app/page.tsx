@@ -46,7 +46,8 @@ export default function CareerAgentUI() {
   const [editing, setEditing] = useState(false);
   const [me, setMe] = useState<{ id: string; email?: string; name?: string } | null>(null);
   const [bootstrapping, setBootstrapping] = useState(true);
-  const push = usePushData();
+  const [approachA, setApproachA] = useState<string | null>(null);
+  const [approachB, setApproachB] = useState<string | null>(null);
 
   // get location
   useEffect(() => {
@@ -200,7 +201,10 @@ export default function CareerAgentUI() {
                 location={location}
                 pathTargets={pathData?.targets}
                 onEvidence={setEvidence}
-    
+                onApproachesChange={(a, b) => {
+                  setApproachA(a);
+                  setApproachB(b);
+                }}
               />
             </Section>
 
@@ -210,14 +214,13 @@ export default function CareerAgentUI() {
                 <Tradeoffs profile={profile} pathTargets={pathData?.targets} />
               </Section>
               <Section title="Analysis" icon={<ListChecks className="h-5 w-5" />}>
-                <Evidence
-                  location={location}
-                  roleA={pathData?.targets?.[0]?.label}
-                  roleB={pathData?.targets?.[1]?.label}
-                  // optionally pass chosen approaches if you expose them from DecisionDuel later:
-                  // approachA="Self-study while employed"
-                  // approachB="Bootcamp / certificate"
-                />
+              <Evidence
+                location={location}
+                roleA={pathData?.targets?.[0]?.label}
+                roleB={pathData?.targets?.[1]?.label}
+                approachA={approachA ?? undefined}
+                approachB={approachB ?? undefined}
+              />
               </Section>
             </div>
 
