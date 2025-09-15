@@ -39,7 +39,7 @@ It answers four key questions:
 
 ---
 
-## 🌟 Standout Product Moments
+## 🌟 Main Features
 
 * **Path Explorer** – Interactive graph: current skills → bridge skills → target roles, with confidence bands.
 * **Decision Duel** – Compare 2–3 strategies with projected offer timing, compensation, ceiling, and burnout risk.
