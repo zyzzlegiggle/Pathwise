@@ -7,6 +7,7 @@ export type ResourceLite = {
   cost?: number | null;
   skills: string[];          // which gaps it addresses
   kind: "learn" | "project"; // foundational module vs portfolio project
+  
 };
 
 export type PathTarget = {
@@ -29,6 +30,7 @@ export type PathExplorerData = {
   edges: PathEdge[];
   courses?: ResourceLite[];   // <- flattened foundational modules
   projects?: ResourceLite[];  // <- flattened portfolio projects
+  
   meta?: {
     userSkills: string[];
     topGaps: string[];

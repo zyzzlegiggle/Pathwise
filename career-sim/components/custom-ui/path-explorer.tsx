@@ -98,7 +98,11 @@ function normalizePathData(raw: any): PathExplorerData {
     target: String(e.target),
   }));
 
-  return { targets, bridges, edges, meta: raw?.meta };
+  // NEW: pass through top-level resources if the API returns them
+  const courses = Array.isArray(raw?.courses) ? raw.courses : undefined;
+  const projects = Array.isArray(raw?.projects) ? raw.projects : undefined;
+
+  return { targets, bridges, edges, courses, projects, meta: raw?.meta };
 }
 
 export function PathExplorer({ data }: { planMode?: string; data?: PathExplorerData }) {

@@ -41,7 +41,6 @@ export default function CareerAgentUI() {
   const [location, setLocation] = useState("");
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [pathData, setPathData] = useState<PathExplorerData | null>(null);
-  const [evidence, setEvidence] = useState<EvidenceBuckets | null>(null);
   const [threadId,setThreadId] = useState(() => uuidv4());   // ← single chat session id
   const [editing, setEditing] = useState(false);
   const [me, setMe] = useState<{ id: string; email?: string; name?: string } | null>(null);
@@ -200,7 +199,6 @@ export default function CareerAgentUI() {
                 hours={hours}
                 location={location}
                 pathTargets={pathData?.targets}
-                onEvidence={setEvidence}
                 onApproachesChange={(a, b) => {
                   setApproachA(a);
                   setApproachB(b);

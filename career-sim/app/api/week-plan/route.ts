@@ -7,7 +7,11 @@ import { PathExplorerData, PathTarget, ResourceLite } from "@/types/path-explore
 import { WeekItem, WeekPlanResponse } from "@/types/week-plan";
 
 /** Make a simple, reasonable, deterministic fallback plan if LLM/DB are unavailable. */
-function fallbackPlan(hours: number, topGaps: string[], bridges: PathExplorerData["bridges"] | undefined): WeekPlanResponse {
+function fallbackPlan(hours: number, topGaps: string[], bridges: PathExplorerData["bridges"] | undefined,
+
+   courses: ResourceLite[] = [],     // NEW
+  projects: ResourceLite[] = [] 
+): WeekPlanResponse {
   const perWeek = clamp(Math.round(hours), 4, 20);
   const base: { title: string; tasks: string[] }[] = [
     { title: "Clarify goals, gather achievements", tasks: ["Define 1–2 target roles", "List 5–8 quantified wins", "Collect work samples/links"] },
@@ -24,16 +28,27 @@ function fallbackPlan(hours: number, topGaps: string[], bridges: PathExplorerDat
     { title: "Offer prep & negotiation basics", tasks: ["Comp bands research", "Practice counters"] },
   ];
 
-  // stitch resources roughly: early weeks bias “learn”, mid weeks “project”, later none/cleanup
-  const learn = bridges?.find(b => b.id.includes("foundational"))?.resources ?? [];
-  const proj  = bridges?.find(b => b.id.includes("portfolio"))?.resources ?? [];
 
-  const weeks: WeekItem[] = base.map((b, i) => {
+  const learnFromBridges = bridges?.find(b => b.id.includes("foundational"))?.resources ?? [];
+  const projFromBridges  = bridges?.find(b => b.id.includes("portfolio"))?.resources ?? [];
+// NEW: merge + de-dupe (id preferred)
+  const byKey = (xs: ResourceLite[]) => {
+    const map = new Map<string, ResourceLite>();
+    for (const r of xs) map.set(r.id ?? `${r.title}|${r.provider ?? ""}`, r);
+    return [...map.values()];
+  };
+
+  const learnPool = byKey([...learnFromBridges, ...courses]);
+  const projPool  = byKey([...projFromBridges,  ...projects]);
+
+  const weeks = base.map((b, i) => {
     const wk = i + 1;
     const focusSkills = topGaps.slice(i % Math.max(1, topGaps.length), (i % Math.max(1, topGaps.length)) + 2);
-    const bundle: ResourceLite[] =
-      wk <= 4 ? learn.slice(i, i + 2)
-    : wk <= 8 ? proj.slice(i, i + 2)
+
+    // Weeks 1–4 → courses; 5–8 → projects; 9–12 → optional/none
+    const bundle =
+      wk <= 4 ? learnPool.slice(i, i + 2)
+    : wk <= 8 ? projPool.slice(i, i + 2)
     : [];
 
     return {
@@ -46,7 +61,7 @@ function fallbackPlan(hours: number, topGaps: string[], bridges: PathExplorerDat
     };
   });
 
-  return {role: "Associate PM", weeks };
+  return { role: "Associate PM", weeks };
 }
 
 /** Ask LLM to synthesize a personalized 12-week plan (uses Path Explorer + profile). */
@@ -57,6 +72,8 @@ async function llmWeekPlan(input: {
   topGaps: string[];
   userSkills: string[];
   bridges: PathExplorerData["bridges"];
+  courses: ResourceLite[];     
+  projects: ResourceLite[];    
   resume?: string;
   years?: number | null;
   education?: string | null;
@@ -77,23 +94,7 @@ async function llmWeekPlan(input: {
               focusSkills: { type: Type.ARRAY, items: { type: Type.STRING } },
               tasks: { type: Type.ARRAY, items: { type: Type.STRING } },
               targetHours: { type: Type.INTEGER },
-              resources: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    id: { type: Type.STRING },
-                    title: { type: Type.STRING },
-                    provider: { type: Type.STRING },
-                    url: { type: Type.STRING },
-                    hours: { type: Type.NUMBER },
-                    cost: { type: Type.NUMBER },
-                    skills: { type: Type.ARRAY, items: { type: Type.STRING } },
-                    kind: { type: Type.STRING },
-                  },
-                  required: ["id", "title", "kind"],
-                },
-              },
+           
             },
             required: ["week", "title", "focusSkills", "tasks", "targetHours"],
           },
@@ -103,7 +104,14 @@ async function llmWeekPlan(input: {
     },
   };
 
-  // give the model your bridges/resources to “snap” to real content instead of inventing
+    const courseDigest = input.courses.slice(0, 60).map(r =>
+    `- [course] ${r.title}${r.provider ? ` (${r.provider})` : ""}${r.url ? ` → ${r.url}` : ""} | skills: ${r.skills?.join(", ") || "—"} | ~${r.hours ?? "?"}h`
+  ).join("\n");
+
+  const projectDigest = input.projects.slice(0, 60).map(r =>
+    `- [project] ${r.title}${r.provider ? ` (${r.provider})` : ""}${r.url ? ` → ${r.url}` : ""} | skills: ${r.skills?.join(", ") || "—"} | ~${r.hours ?? "?"}h`
+  ).join("\n");
+
   const bridgeDigest = input.bridges.map(b => {
     const rs = (b.resources ?? []).slice(0, 30).map(r =>
       `- [${r.kind}] ${r.title}${r.provider ? ` (${r.provider})` : ""}${r.url ? ` → ${r.url}` : ""} | skills: ${r.skills?.join(", ") || "—"} | ~${r.hours ?? "?"}h`);
@@ -111,22 +119,17 @@ async function llmWeekPlan(input: {
   }).join("\n\n");
 
   const prompt = `
-Design a concise, *doable* 12-week plan to reach one of the target roles.
-- Use ~${input.hours} hours per week (cap each week between 4 and 20).
-- Prefer resources listed under “Bridges” (foundational = learn; portfolio = project). If none match, skip rather than inventing.
-- Each week: short title, 2–6 tasks, 1–3 focusSkills (from topGaps or userSkills), targetHours integer.
-- Ensure skills recur (spaced repetition), and projects produce tangible artifacts.
-- Keep language crisp; no fluff.
+Design a concise, doable 12-week plan...
+[snip existing instructions]
 
-Context
-Location: ${input.location}
-Years: ${input.years ?? "unknown"}, Education: ${input.education ?? "unknown"}
-User skills: ${input.userSkills.join(", ") || "—"}
-Top gap skills to emphasize: ${input.topGaps.join(", ") || "—"}
-Target roles (pick the most plausible one implicitly): ${input.targets.map(t => t.label).join(", ")}
-
-Bridges & resources (use when relevant; otherwise omit resources):
+Bridges & resources (prefer when relevant):
 ${bridgeDigest}
+
+Additional foundational courses (prefer for "Foundation" weeks):
+${courseDigest || "—"}
+
+Additional portfolio projects (prefer for "Build/Launch" weeks):
+${projectDigest || "—"}
 
 Resume snippet (truncate to 1200 chars max):
 ${(input.resume ?? "").slice(0, 1200)}
@@ -135,28 +138,79 @@ ${(input.resume ?? "").slice(0, 1200)}
   const raw = await structuredOutput(prompt, schema);
   const parsed = JSON.parse(raw) as WeekPlanResponse;
 
-  // sanitize & clamp hours
   const perWeek = clamp(Math.round(input.hours), 4, 20);
 
-    const weeks: WeekItem[] = (parsed.weeks ?? [])
-    .map((w, i) => {
-        const base = {
-        week: typeof w.week === "number" ? w.week : i + 1,
-        title: String(w.title || `Week ${i + 1}`),
-        focusSkills: Array.isArray(w.focusSkills) ? w.focusSkills.slice(0, 3) : [],
-        tasks: Array.isArray(w.tasks) ? w.tasks.slice(0, 6) : [],
-        targetHours: clamp(Number(w.targetHours ?? perWeek), 4, 20),
-        } satisfies Omit<WeekItem, "resources">;
+let weeks: WeekItem[] = (parsed.weeks ?? [])
+  .map((w, i) => ({
+    week: typeof w.week === "number" ? w.week : i + 1,
+    title: String(w.title || `Week ${i + 1}`),
+    focusSkills: Array.isArray(w.focusSkills) ? w.focusSkills.slice(0, 3) : [],
+    tasks: Array.isArray(w.tasks) ? w.tasks.slice(0, 6) : [],
+    targetHours: clamp(Number(w.targetHours ?? perWeek), 4, 20),
+    // IMPORTANT: drop any LLM-provided resources here
+  }))
+  .slice(0, 12);
 
-        const res = Array.isArray(w.resources) ? w.resources.slice(0, 3) : undefined;
-        return res ? { ...base, resources: res } : base;  // ← include only when present
-    })
-    .slice(0, 12);
+// Fill any missing weeks from fallback titles/tasks, but still without resources
+const fb = fallbackPlan(input.hours, input.topGaps, input.bridges, input.courses, input.projects).weeks;
+while (weeks.length < 12) weeks.push({ ...fb[weeks.length], resources: undefined });
 
-    const fb = fallbackPlan(input.hours, input.topGaps, input.bridges).weeks;
-    while (weeks.length < 12) weeks.push(fb[weeks.length]);
+// NOW attach resources from courses/projects/bridges
+const { learnPool, projPool } = buildResourcePools({
+  bridges: input.bridges,
+  courses: input.courses,
+  projects: input.projects,
+});
 
-  return { role: input.role,weeks, echo: { usedLLM: true } };
+weeks = weeks.map(w => {
+  const resources = pickResourcesForWeek(w.week, w.focusSkills ?? [], learnPool, projPool, 2);
+  return resources.length ? { ...w, resources } : w; // only include when we have matches
+});
+
+return { role: input.role, weeks, echo: { usedLLM: true } };
+}
+
+function dedupeByIdOrKey<T extends { id?: string; title?: string; provider?: string }>(xs: T[]) {
+  const m = new Map<string, T>();
+  for (const r of xs) m.set(r.id ?? `${r.title}|${r.provider ?? ""}`, r);
+  return [...m.values()];
+}
+
+function buildResourcePools({
+  bridges, courses = [], projects = [],
+}: {
+  bridges?: PathExplorerData["bridges"];
+  courses?: ResourceLite[];
+  projects?: ResourceLite[];
+}) {
+  const learnFromBridges = bridges?.find(b => b.id.includes("foundational"))?.resources ?? [];
+  const projFromBridges  = bridges?.find(b => b.id.includes("portfolio"))?.resources ?? [];
+  return {
+    learnPool: dedupeByIdOrKey<ResourceLite>([...learnFromBridges, ...courses]),
+    projPool:  dedupeByIdOrKey<ResourceLite>([...projFromBridges,  ...projects]),
+  };
+}
+
+function pickResourcesForWeek(
+  weekNum: number,
+  focusSkills: string[],
+  learnPool: ResourceLite[],
+  projPool: ResourceLite[],
+  count = 2
+): ResourceLite[] {
+  const inFoundation = weekNum <= 4;
+  const inBuild      = weekNum >= 5 && weekNum <= 8;
+  const pool = inFoundation ? learnPool : inBuild ? projPool : [];
+  if (!pool.length) return [];
+  const norm = (s: string) => s.toLowerCase();
+  const fset = new Set(focusSkills.map(norm));
+
+  const scored = pool.map(r => ({
+    r,
+    score: (r.skills ?? []).map(norm).reduce((acc, s) => acc + (fset.has(s) ? 1 : 0), 0),
+  }));
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, Math.max(0, Math.min(count, 3))).map(s => s.r);
 }
 
 export async function POST(req: NextRequest) {
@@ -178,6 +232,8 @@ export async function POST(req: NextRequest) {
     const bridges = pathData?.bridges ?? [];
     const topGaps = pathData?.meta?.topGaps ?? [];
     const userSkills = pathData?.meta?.userSkills ?? [];
+    const courses   = pathData?.courses ?? [];
+    const projects  = pathData?.projects ?? [];
 
     const role =
       preferredRole
@@ -200,6 +256,8 @@ export async function POST(req: NextRequest) {
         topGaps,
         userSkills,
         bridges,
+        courses, 
+    projects, 
         resume,
         years,
         education,
