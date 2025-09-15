@@ -1,3 +1,4 @@
+# used for seeding db
 import logging, time, math, random
 import pymysql
 from pymysql.err import OperationalError
@@ -68,9 +69,29 @@ def write_checkpoint(n: int) -> None:
         logger.error(f"Failed to write checkpoint to GCS: {e}")
 
 #checkpoint for file
-CHECKPOINT_FILE = "./seed_people.state"
 
 PEOPLE_CHECKPOINT_PATH = os.getenv("PEOPLE_CHECKPOINT_PATH", "./seed_people.state")
+
+SKILLS_CHECKPOINT_PATH = os.getenv("SKILLS_CHECKPOINT_PATH", "./skills_import.state")
+
+def read_skills_checkpoint() -> int:
+    try:
+        if not os.path.exists(SKILLS_CHECKPOINT_PATH):
+            return 0
+        with open(SKILLS_CHECKPOINT_PATH, "r", encoding="utf-8") as f:
+            data = f.read().strip()
+            return int(data) if data else 0
+    except Exception as e:
+        logger.warning(f"Failed to read skills checkpoint: {e}")
+        return 0
+
+def write_skills_checkpoint(n: int) -> None:
+    try:
+        with open(SKILLS_CHECKPOINT_PATH, "w", encoding="utf-8") as f:
+            f.write(str(n))
+        logger.debug(f"Wrote skills checkpoint at row index {n}")
+    except Exception as e:
+        logger.error(f"Failed to write skills checkpoint: {e}")
 
 def read_people_checkpoint() -> int:
     try:
@@ -126,15 +147,9 @@ def is_transient_mysql_err(e: Exception) -> bool:
     return code in (2006, 2013)
 
 # ---------- embedding ----------
-def generate_embedding(text: str)-> List[float]:
-    logger.debug(f"Generating embedding for: {text}")
-    client = genai.Client()
-    result = client.models.embed_content(
-        model="gemini-embedding-001",
-        contents=text,
-        config=types.EmbedContentConfig(output_dimensionality=768)
-    )
-    return result.embeddings[0].values
+def generate_embedding_384(text: str) -> List[float]:
+    # Reuse the local SentenceTransformer you already set up
+    return embed_texts_local([text], batch_size=1)[0]  # 384 floats
 
 def generate_embedding_alias(name: str, aliases_json: Optional[str]) -> List[float]:
     text_parts = [name]
@@ -146,9 +161,7 @@ def generate_embedding_alias(name: str, aliases_json: Optional[str]) -> List[flo
         except Exception as ex:
             logger.warning(f"Failed to parse aliases for {name}: {ex}")
     text = " | ".join(text_parts)
-    result = generate_embedding(text)
-    return result
-
+    return generate_embedding_384(text)
 # ---------- robust batch insert with retries ----------
 def insert_skills(
     rows: List[tuple],
@@ -165,16 +178,16 @@ def insert_skills(
     # upsert SQL (see section above)
     sql = """
         INSERT INTO skill_node (name, parent_id, aliases, embedding)
-        VALUES (%s, NULL, %s, %s)
+        VALUES (%s, NULL, %s, CAST(%s AS VECTOR(384)))
         ON DUPLICATE KEY UPDATE
-          aliases = VALUES(aliases),
-          embedding = VALUES(embedding)
+        aliases = VALUES(aliases),
+        embedding = VALUES(embedding)
     """
-
+    
     # figure out where to start
     offset = (
         start_index if start_index is not None
-        else (read_checkpoint() if use_checkpoint else 0)
+        else (read_skills_checkpoint() if use_checkpoint else 0)
     )
     if offset < 0 or offset > total:
         offset = 0
@@ -203,8 +216,8 @@ def insert_skills(
         t_emb0 = time.time()
         payload = []
         for name, aliases_json in batch:
-            emb = generate_embedding_alias(name, aliases_json)
-            emb_str = json.dumps(emb)
+            emb = generate_embedding_alias(name, aliases_json)   # 384-D list[float]
+            emb_str = json.dumps(emb)                            # JSON array string
             payload.append((name, aliases_json, emb_str))
         t_emb1 = time.time()
         logger.debug(f"Batch {batch_index} embeddings computed in {t_emb1 - t_emb0:.2f}s")
@@ -232,7 +245,7 @@ def insert_skills(
 
                 # ✅ update checkpoint AFTER successful commit
                 if use_checkpoint:
-                    write_checkpoint(global_end_excl)
+                    write_skills_checkpoint(global_end_excl)
                     logger.debug(f"Wrote checkpoint at row index {global_end_excl}")
                 break
 
@@ -555,18 +568,7 @@ def seed_people(
         raise HTTPException(status_code=400, detail=f"Failed to read pickle: {e}")
 
     # Convert rows into list of dicts
-    records = []
-    for idx, row in enumerate(df.itertuples(index=False), start=1):
-        try:
-            rec = row._asdict() if hasattr(row, "_asdict") else dict(row) if isinstance(row, dict) else None
-            if rec is None:
-                logger.debug(f"⚠️ Skipping non-dictable row at index {idx}")
-                continue
-            records.append(rec)
-        except Exception as ex:
-            logger.warning(f"⚠️ Failed to parse row {idx}: {ex}")
-        if idx % 1000 == 0:
-            logger.info(f"📊 Parsed {idx} rows so far...")
+    records = df.to_dict(orient="records")
 
     if limit is not None:
         logger.info(f"Applying row limit={limit}")
@@ -634,7 +636,7 @@ def seed_people(
         rec = {k: deep_clean(v) for k, v in rec.items()}
         intro = rec.get("Intro") or {}
 
-        full_name     = (rec.get("Full Name") or intro.get("Full Name") or "") or ""
+        full_name = (rec.get("Full Name") or intro.get("Full Name") or "") or ""
         current_title = None  # TODO: derive if you want (e.g., from current exp)
         workplace     = none_if_nan(rec.get("Workplace") or intro.get("Workplace"))
         location      = none_if_nan(rec.get("Location")  or intro.get("Location"))
