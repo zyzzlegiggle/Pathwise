@@ -1,10 +1,16 @@
+// components/custom-ui/evidence.tsx
 'use client';
 
 import * as React from 'react';
-import { Info, ListChecks, ArrowUpRight, HelpCircle } from 'lucide-react';
-import { EvidenceBuckets, EvidenceItem } from '@/types/evidence-types';
+import { Info, ArrowUpRight } from 'lucide-react';
 
-type Confidence = 'Strong' | 'Moderate' | 'Preliminary';
+export type Confidence = 'Strong' | 'Moderate' | 'Preliminary';
+export type EvidenceItem = { text: string; weight: number; source?: string; url?: string };
+export type EvidenceBuckets = {
+  comparableOutcomes: EvidenceItem[];
+  alumniStories: EvidenceItem[];
+  marketNotes: EvidenceItem[];
+};
 
 function toConfidence(weight?: number): Confidence {
   const w = typeof weight === 'number' ? weight : 0;
@@ -12,35 +18,21 @@ function toConfidence(weight?: number): Confidence {
   if (w >= 0.4) return 'Moderate';
   return 'Preliminary';
 }
-
 function confidenceClasses(level: Confidence) {
-  // subtle chips that work in dark/light
-  if (level === 'Strong')
-    return 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/20 dark:text-emerald-200';
-  if (level === 'Moderate')
-    return 'bg-amber-100 text-amber-900 dark:bg-amber-900/20 dark:text-amber-200';
+  if (level === 'Strong')   return 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/20 dark:text-emerald-200';
+  if (level === 'Moderate') return 'bg-amber-100 text-amber-900 dark:bg-amber-900/20 dark:text-amber-200';
   return 'bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-200';
 }
-
 function domainFromUrl(url?: string) {
-  try {
-    if (!url) return '';
-    const u = new URL(url);
-    return u.hostname.replace(/^www\./, '');
-  } catch {
-    return '';
-  }
+  try { return url ? new URL(url).hostname.replace(/^www\./, '') : ''; } catch { return ''; }
 }
-
 function sortByConfidence(items: EvidenceItem[]) {
   return [...items].sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0));
 }
-
 function useClamp(initial = true) {
   const [expanded, setExpanded] = React.useState(!initial);
   return { expanded, toggle: () => setExpanded((s) => !s) };
 }
-
 function TextClamp({ text, clampChars = 220 }: { text: string; clampChars?: number }) {
   const { expanded, toggle } = useClamp(true);
   const isLong = text.length > clampChars;
@@ -49,10 +41,7 @@ function TextClamp({ text, clampChars = 220 }: { text: string; clampChars?: numb
     <div className="leading-snug">
       {shown}{' '}
       {isLong && (
-        <button
-          className="inline text-xs underline underline-offset-2 opacity-70 hover:opacity-100"
-          onClick={toggle}
-        >
+        <button className="inline text-xs underline underline-offset-2 opacity-70 hover:opacity-100" onClick={toggle}>
           {expanded ? 'Show less' : 'Show more'}
         </button>
       )}
@@ -60,19 +49,10 @@ function TextClamp({ text, clampChars = 220 }: { text: string; clampChars?: numb
   );
 }
 
-function Bucket({
-  title,
-  items,
-  defaultLimit = 3,
-}: {
-  title: string;
-  items: EvidenceItem[];
-  defaultLimit?: number;
-}) {
+function Bucket({ title, items, defaultLimit = 3 }: { title: string; items: EvidenceItem[]; defaultLimit?: number; }) {
   const sorted = sortByConfidence(items);
   const [showAll, setShowAll] = React.useState(false);
   const visible = showAll ? sorted : sorted.slice(0, defaultLimit);
-
   if (!items?.length) return null;
 
   return (
@@ -102,7 +82,7 @@ function Bucket({
                     {conf} confidence
                   </span>
                   {it.source && <span className="text-xs opacity-70">• {it.source}</span>}
-                  {dom && <span className="text-xs opacity-70">• {dom}</span>}
+                  {dom && !it.source && <span className="text-xs opacity-70">• {dom}</span>}
                   {it.url && (
                     <a
                       href={it.url}
@@ -114,7 +94,6 @@ function Bucket({
                     </a>
                   )}
                 </div>
-
                 <TextClamp text={it.text} />
               </div>
             </li>
@@ -125,21 +104,53 @@ function Bucket({
   );
 }
 
-export function Evidence({ data }: { data?: EvidenceBuckets }) {
-  const hasLive =
-    !!data &&
-    (data.comparableOutcomes?.length ||
-      data.alumniStories?.length ||
-      data.marketNotes?.length);
+export function Evidence({
+  location,
+  roleA,
+  roleB,
+  approachA,
+  approachB,
+  limitPerBucket = 5,
+}: {
+  location: string;
+  roleA?: string;
+  roleB?: string;
+  approachA?: string;
+  approachB?: string;
+  limitPerBucket?: number;
+}) {
+  const [data, setData] = React.useState<EvidenceBuckets | null>(null);
+  const [loading, setLoading] = React.useState(true);
 
- if (!hasLive) {
+  React.useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    (async () => {
+      try {
+        const res = await fetch("/api/evidence", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          cache: "no-store",
+          body: JSON.stringify({ location, roleA, roleB, approachA, approachB, limitPerBucket }),
+        });
+        const json = await res.json();
+        if (alive) setData(json);
+      } catch {
+        if (alive) setData({ comparableOutcomes: [], alumniStories: [], marketNotes: [] });
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, [location, roleA, roleB, approachA, approachB, limitPerBucket]);
+
+  // existing skeletons
+  const hasLive = !!data && (data.comparableOutcomes?.length || data.alumniStories?.length || data.marketNotes?.length);
+  if (loading && !hasLive) {
     return (
       <div className="space-y-3">
-        {[0, 1, 2].map((i) => (
-          <div
-            key={i}
-            className="rounded-xl border p-3 dark:border-gray-800 animate-pulse"
-          >
+        {[0,1,2].map(i => (
+          <div key={i} className="rounded-xl border p-3 dark:border-gray-800 animate-pulse">
             <div className="mb-2 h-3 w-40 rounded bg-gray-200 dark:bg-gray-800" />
             <div className="space-y-2">
               <div className="h-4 rounded bg-gray-200 dark:bg-gray-800" />
@@ -152,14 +163,17 @@ export function Evidence({ data }: { data?: EvidenceBuckets }) {
     );
   }
 
-return (
-  <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1 [scrollbar-gutter:stable] motion-safe:scroll-smooth">
-    <div className="grid grid-cols-1 gap-3">
-      <Bucket title="Comparable outcomes" items={data!.comparableOutcomes} />
-      <Bucket title="Alumni stories" items={data!.alumniStories} />
-      <Bucket title="Market notes" items={data!.marketNotes} />
-    </div>
-  </div>
+  if (!hasLive) {
+    return <div className="text-xs text-gray-500">No external evidence found right now.</div>;
+  }
 
+  return (
+    <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1 [scrollbar-gutter:stable] motion-safe:scroll-smooth">
+      <div className="grid grid-cols-1 gap-3">
+        <Bucket title="Comparable outcomes" items={data!.comparableOutcomes} />
+        <Bucket title="Alumni stories" items={data!.alumniStories} />
+        <Bucket title="Market notes" items={data!.marketNotes} />
+      </div>
+    </div>
   );
 }

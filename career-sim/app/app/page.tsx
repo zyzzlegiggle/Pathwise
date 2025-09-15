@@ -210,7 +210,14 @@ export default function CareerAgentUI() {
                 <Tradeoffs profile={profile} pathTargets={pathData?.targets} />
               </Section>
               <Section title="Analysis" icon={<ListChecks className="h-5 w-5" />}>
-                <Evidence data={evidence ?? undefined} />
+                <Evidence
+                  location={location}
+                  roleA={pathData?.targets?.[0]?.label}
+                  roleB={pathData?.targets?.[1]?.label}
+                  // optionally pass chosen approaches if you expose them from DecisionDuel later:
+                  // approachA="Self-study while employed"
+                  // approachB="Bootcamp / certificate"
+                />
               </Section>
             </div>
 
