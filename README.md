@@ -3,7 +3,7 @@
 
 Pathwise is a career-planning agent that simulates counterfactual career paths—rooted in real data, transparent about uncertainty, and tailored to each user’s skill profile, constraints, and goals.
 
-🚀 **[Live Demo](https://your-deployed-url.com)**  
+ [Live Demo](https://your-deployed-url.com) 
 ---
 
 ## 🚀 Project Overview
@@ -104,3 +104,50 @@ App runs at [http://localhost:3000](http://localhost:3000)
 * **Auth & Scheduling (optional):** Google OAuth/Calendar
 * **Database & ORM:** TiDB/MySQL + Prisma
 * **Orchestration:** LangChain
+
+### File Structure
+career-sim/
+├── app/
+│   ├── api/
+│   │   ├── chat/
+│   │   ├── decision/
+│   │   ├── evidence/
+│   │   ├── extract-profile/
+│   │   ├── google/
+│   │   ├── login/
+│   │   ├── logout/
+│   │   ├── me/
+│   │   ├── path/
+│   │   ├── people-like-me/
+│   │   ├── profile/
+│   │   ├── register/
+│   │   ├── session-data/
+│   │   ├── tradeoffs/
+│   │   └── week-plan/
+│   ├── app/page.tsx
+│   ├── favicon.ico
+│   ├── globals.css
+│   ├── layout.tsx
+│   ├── login/page.tsx
+│   ├── page.tsx
+│   ├── protected/page.tsx
+│   └── register/page.tsx
+├── components/
+│   ├── custom-ui/… (chat-widget, decision-duel, profile-editor, etc.)
+│   ├── system/session-provider.tsx
+│   └── ui/… (badge, button, card, dialog, slider, etc.)
+├── lib/… (auth.ts, db.ts, llm.ts, query-builder.ts, etc.)
+├── prisma/schema.prisma
+├── public/ (file.svg, globe.svg, next.svg, vercel.svg, window.svg)
+├── types/ (decision-response.ts, evidence-types.ts, path-explorer-data.ts, user-profile.ts, week-plan.ts)
+├── middleware.ts
+├── next.config.ts
+├── postcss.config.mjs
+├── eslint.config.mjs
+├── tsconfig.json
+├── package.json
+├── package-lock.json
+├── README.md
+└── node_modules/… (dependencies)
+
+
