@@ -31,7 +31,7 @@ It answers four key questions:
 
 4. 📚 **Evidence Retrieval (TiDB + Vector Search + RAG)**
 
-   * **Storage & Indexing:** TiDB Cloud indexes ESCO skills data, anonymized career trajectories, job descriptions, salary surveys, and alumni stories.
+   * **Storage & Indexing:** TiDB Cloud indexes ESCO skills data, professional user profiles, job descriptions, salary surveys, and alumni stories.
    * **Retrieval:** Vector search finds similar profiles/resources; RAG pipelines ground LLM outputs in retrieved documents.
 
 5. 🔎 **Explainable Trade-offs**
