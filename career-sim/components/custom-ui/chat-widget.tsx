@@ -5,6 +5,7 @@ import { Send, Loader2, Sparkles, Trash2 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { UserProfile } from '@/types/user-profile';
 import { useThreadId } from '../system/session-provider';
+import ReactMarkdown from "react-markdown";
 
 type ChatRole = 'user' | 'assistant';
 
@@ -146,7 +147,7 @@ export function ChatWidget({ profile, variant='default', threadId: threadIdProp 
                   : 'max-w-[95%] whitespace-pre-wrap rounded-xl border px-3 py-2 shadow-sm bg-gray-50/70 dark:border-gray-700 dark:bg-gray-900/70'
               }
             >
-              {m.content}
+              <ReactMarkdown>{m.content}</ReactMarkdown>
             </div>
           </div>
         ))}

@@ -10,7 +10,7 @@ import { getSessionData } from "@/lib/session-store";
 
 export const runtime = "nodejs";
 
-const base = new ChatGoogleGenerativeAI({ model: "gemini-2.5-flash", temperature: 0 });
+const base = new ChatGoogleGenerativeAI({ model: "gemini-2.5-flash-lite", temperature: 0 });
 
 // "anything with invoke()" so tool-bound model type-checks
 type Invoker = { invoke: (input: unknown) => Promise<any> };
@@ -51,78 +51,59 @@ export async function POST(req: NextRequest) {
     console.log(threadId);
 
     // --- tools (function calling) ---
-    
-const getPathData = tool(
-  async (_: {}): Promise<{ targets: { id: string; label: string }[]; meta: { userSkills: string[]; topGaps: string[] } }> => {
-    const raw: any = (session as any)?.pathData ?? {};
 
-    const targets = Array.isArray(raw?.targets)
-      ? raw.targets.map((t: any) => ({
-          id: typeof t?.id === "string" ? t.id : String(t?.id ?? ""),
-          label: typeof t?.label === "string" ? t.label : String(t?.label ?? ""),
-        })).filter((t: any) => t.label)
-      : [];
-
-    const meta = {
-      userSkills: Array.isArray(raw?.meta?.userSkills) ? raw.meta.userSkills.map((s: any) => String(s)) : [],
-      topGaps: Array.isArray(raw?.meta?.topGaps) ? raw.meta.topGaps.map((s: any) => String(s)) : [],
-    };
-
-    return { targets, meta };
-  },
-  {
-    name: "get_path_data",
-    description:
-      "Get path explorer summary: predicted future  roles (id,label) and user skills and also skill gaps to future predicted roles (userSkills, topGaps = skill gaps needed for target roles). Returns {targets, meta}. This also returns courses and projects (learning resources) that user can do",
-    schema: z.object({}), // no args
-  }
-);
+const asJSON = (v: unknown) => JSON.stringify(v ?? null);
 
 const session = await getSessionData(threadId) ?? {}; // durable read
 
-    const getDecisionDuel = tool(
-      async (_: {}): Promise<unknown> => session.decisionDuel ?? {},
-      {
-        name: "get_decision_duel",
-        description: "Get comparison between two paths: approaches, metrics, and timeline CDF.",
-        schema: z.object({}),
-      }
-    );
+const getPathData = tool(
+  async (_: {}) => {
+    const raw: any = (session as any)?.pathData ?? {};
+    const targets = Array.isArray(raw?.targets)
+      ? raw.targets
+          .map((t: any) => ({
+            id: typeof t?.id === "string" ? t.id : String(t?.id ?? ""),
+            label: typeof t?.label === "string" ? t.label : String(t?.label ?? ""),
+          }))
+          .filter((t: any) => t.label)
+      : [];
+    const meta = {
+      userSkills: Array.isArray(raw?.meta?.userSkills) ? raw.meta.userSkills.map(String) : [],
+      topGaps: Array.isArray(raw?.meta?.topGaps) ? raw.meta.topGaps.map(String) : [],
+    };
+    // RETURN STRING
+    return asJSON({ targets, meta });
+  },
+  { name: "get_path_data", description: "...", schema: z.object({}) }
+);
 
-    const getTradeoffs = tool(
-      async (_: {}): Promise<unknown> => session.tradeoffs ?? [],
-      {
-        name: "get_tradeoffs",
-        description: "Get tradeoff items which are items  that will most improve interview chances for THIS candidate/user.",
-        schema: z.object({}),
-      }
-    );
+const getDecisionDuel = tool(
+  async (_: {}) => asJSON(session.decisionDuel ?? {}),
+  { name: "get_decision_duel", description: "...", schema: z.object({}) }
+);
 
-    const getPeopleLikeMe = tool(
-      async (_: {}): Promise<unknown> => session.peopleLikeMe ?? [],
-      {
-        name: "get_people_like_me",
-        description: "Get similar people to user.",
-        schema: z.object({}),
-      }
-    );
+const getTradeoffs = tool(
+  async (_: {}) => asJSON(session.tradeoffs ?? []),
+  { name: "get_tradeoffs", description: "...", schema: z.object({}) }
+);
 
-    const getWeekPlan = tool(
-      async ({ phase }: { phase?: string }): Promise<unknown> => {
-        const wp: any = session.weekPlan ?? {};
-        if (phase && Array.isArray(wp?.phases)) {
-          const pm = wp.phases.find((p: any) => p.label === phase);
-          const weeks = (wp.weeks ?? []).filter((w: any) => w.week >= pm?.start && w.week <= pm?.end);
-          return { ...wp, weeks };
-        }
-        return wp;
-      },
-      {
-        name: "get_week_plan",
-        description: "Get the week-by-week plan; optionally filter by a specific phase.",
-        schema: z.object({ phase: z.string().optional() }),
-      }
-    );
+const getPeopleLikeMe = tool(
+  async (_: {}) => asJSON(session.peopleLikeMe ?? []),
+  { name: "get_people_like_me", description: "...", schema: z.object({}) }
+);
+
+const getWeekPlan = tool(
+  async ({ phase }: { phase?: string }) => {
+    const wp: any = session.weekPlan ?? {};
+    if (phase && Array.isArray(wp?.phases)) {
+      const pm = wp.phases.find((p: any) => p.label === phase);
+      const weeks = (wp.weeks ?? []).filter((w: any) => w.week >= pm?.start && w.week <= pm?.end);
+      return asJSON({ ...wp, weeks }); // RETURN STRING
+    }
+    return asJSON(wp); // RETURN STRING
+  },
+  { name: "get_week_plan", description: "...", schema: z.object({ phase: z.string().optional() }) }
+);
 
     // bind tools to model
     const llmWithTools = base.bindTools([getPathData, getDecisionDuel, getTradeoffs, getPeopleLikeMe, getWeekPlan]);
@@ -139,7 +120,7 @@ const session = await getSessionData(threadId) ?? {}; // durable read
       .compile();
 
     const systemPrompt = `
-You are a concise, pragmatic career coach inside "Career Strategy Studio".
+You are a concise, pragmatic career coach inside "Pathwise".
 - Use function calls (tools) ONLY when you need specific data.
 - Be specific and measurable (timelines, resources, deliverables).
 - If uncertain, say how to validate quickly.

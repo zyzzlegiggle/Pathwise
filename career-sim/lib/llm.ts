@@ -3,7 +3,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY! });
 const EMBEDDING_MODEL = "gemini-embedding-001";
-const TEXT_MODEL = "gemini-2.5-flash";
+const TEXT_MODEL = "gemini-2.5-flash-lite";
 const DIM   = 384; // match your TiDB column
 
 function l2norm(v: number[]) {

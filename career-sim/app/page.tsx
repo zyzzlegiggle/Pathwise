@@ -69,7 +69,7 @@ function NavBar() {
           role="navigation"
         >
           <Link href="#" className="flex items-center gap-2 font-semibold tracking-tight">
-            <Sparkles className="h-5 w-5" /> Career Strategy Studio
+            <Sparkles className="h-5 w-5" /> Pathwise
           </Link>
           <div className="hidden items-center gap-6 md:flex">
             <a href="#features" className="text-sm text-gray-700 hover:opacity-80 dark:text-gray-300">Features</a>
@@ -165,7 +165,7 @@ function Hero() {
                 <span className="inline-flex h-2.5 w-2.5 rounded-full bg-red-400" />
                 <span className="inline-flex h-2.5 w-2.5 rounded-full bg-yellow-400" />
                 <span className="inline-flex h-2.5 w-2.5 rounded-full bg-green-400" />
-                <span className="ml-2">Career Strategy Studio</span>
+                <span className="ml-2">Pathwise</span>
               </div>
               <div className="mt-3 grid gap-3 md:grid-cols-2">
                 <Card title="Path Explorer" icon={<Layers className="h-4 w-4" />} />
@@ -420,7 +420,7 @@ function Footer() {
     <footer className="mx-auto mb-10 mt-10 w-full max-w-7xl px-4">
       <div className="rounded-2xl border bg-white/60 p-4 text-sm text-gray-600 backdrop-blur dark:border-gray-800 dark:bg-gray-900/60 dark:text-gray-300">
         <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
-          <p>© {new Date().getFullYear()} Career Strategy Studio</p>
+          <p>© {new Date().getFullYear()} Pathwise</p>
           <div className="flex items-center gap-3">
             <a href="#" className="inline-flex items-center gap-1 hover:opacity-80"><Github className="h-4 w-4"/> GitHub</a>
             <a href="#" className="inline-flex items-center gap-1 hover:opacity-80"><Linkedin className="h-4 w-4"/> LinkedIn</a>

@@ -163,7 +163,7 @@ export default function CareerAgentUI() {
           <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
             <div>
               <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
-                <Sparkles className="h-6 w-6" /> Career Strategy Studio
+                <Sparkles className="h-6 w-6" /> Pathwise
               </h1>
               <p className="mt-1 max-w-2xl text-sm text-gray-600 dark:text-gray-300">
                 Explore realistic paths, compare choices, and get a weekly plan for your career. Clear numbers, simple language, and sources.
