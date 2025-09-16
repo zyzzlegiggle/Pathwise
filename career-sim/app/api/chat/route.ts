@@ -10,7 +10,7 @@ import { getSessionData } from "@/lib/session-store";
 
 export const runtime = "nodejs";
 
-const base = new ChatGoogleGenerativeAI({ model: "gemini-2.5-flash-lite", temperature: 0 });
+const base = new ChatGoogleGenerativeAI({ model: "gemini-2.5-flash", temperature: 0 });
 
 // "anything with invoke()" so tool-bound model type-checks
 type Invoker = { invoke: (input: unknown) => Promise<any> };
