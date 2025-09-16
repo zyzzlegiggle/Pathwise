@@ -44,4 +44,10 @@ export function getAuthCookieOptions(remember: boolean) {
 
 export const authCookie = {
   name: "auth_token",
+  options: {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+  },
 };
