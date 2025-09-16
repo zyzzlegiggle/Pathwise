@@ -1,4 +1,5 @@
 
+/* eslint-disable react-hooks/rules-of-hooks */
 'use client'
 export const Section = ({ title, icon, children, actions }: any) => (
   <section

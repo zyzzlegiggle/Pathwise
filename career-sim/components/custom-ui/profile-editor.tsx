@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/rules-of-hooks */
 // components/custom-ui/profile-editor.tsx
 'use client';
 

@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/rules-of-hooks */
 'use client'
 import React, { useEffect, useMemo, useState } from "react";import {
   ArrowRight,

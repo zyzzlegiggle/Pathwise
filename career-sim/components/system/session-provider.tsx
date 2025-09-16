@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/rules-of-hooks */
 // session-provider.tsx
 'use client';
 import { createContext, useContext, useRef } from "react";

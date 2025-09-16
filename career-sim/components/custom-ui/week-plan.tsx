@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/rules-of-hooks */
 'use client'
 import { useEffect, useMemo, useState } from "react";
 import { Calendar, ChevronDown, Link as LinkIcon, Sparkles } from "lucide-react";

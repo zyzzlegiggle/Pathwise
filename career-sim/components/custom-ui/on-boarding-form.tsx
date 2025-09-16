@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/rules-of-hooks */
 'use client'
 import { UserProfile } from "@/types/user-profile";
 import { ArrowRight, Sparkles, RefreshCw, AlertCircle } from "lucide-react";

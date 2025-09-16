@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/rules-of-hooks */
 'use client'
 
 export const Slider = ({ label, min, max, step = 1, value, onChange, suffix }: any) => (

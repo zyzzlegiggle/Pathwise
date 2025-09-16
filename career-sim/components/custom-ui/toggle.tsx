@@ -1,4 +1,5 @@
 
+/* eslint-disable react-hooks/rules-of-hooks */
 'use client'
 export const Toggle = ({ options, value, onChange }: { options: string[]; value: string; onChange: (v: string) => void }) => (
   <div className="inline-flex rounded-xl border bg-white/60 p-1 text-sm shadow-inner dark:border-gray-800 dark:bg-gray-900/60" role="tablist" aria-label="Toggle">

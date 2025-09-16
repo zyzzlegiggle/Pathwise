@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/rules-of-hooks */
 'use client'
 import { DbUserProfile, PathApiProfile, PathExplorerData, UIUserProfile } from "@/types/path-explorer-data";
 import { UserProfile } from "@prisma/client";

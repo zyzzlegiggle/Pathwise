@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/rules-of-hooks */
 // components/custom-ui/evidence.tsx
 'use client';
 

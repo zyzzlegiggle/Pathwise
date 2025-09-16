@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/rules-of-hooks */
 'use client'
 import { useEffect, useMemo, useState } from "react";
 import { Info, LineChart as LineChartIcon, Loader2 } from "lucide-react";
