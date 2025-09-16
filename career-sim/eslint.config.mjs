@@ -13,7 +13,15 @@ const eslintConfig = [
   {
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
-      "@typescript-eslint/ban-types": "off", // disable "{}" complaints
+      "@typescript-eslint/ban-types": [
+        "error",
+        {
+          extendDefaults: true,
+          types: {
+            "{}": false, // allow using {} as a type
+          },
+        },
+      ],
     },
   },
 ];
