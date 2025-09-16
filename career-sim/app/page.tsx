@@ -342,6 +342,7 @@ function Testimonials() {
     },
   ];
   return (
+    
     <section id="testimonials" className="mx-auto mt-20 w-full max-w-7xl px-4">
       <motion.h2
         initial={{ opacity: 0, y: 8 }}

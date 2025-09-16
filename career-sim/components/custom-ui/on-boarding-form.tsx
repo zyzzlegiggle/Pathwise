@@ -43,11 +43,11 @@ export function OnboardingForm({ onComplete }: { onComplete: (p: UserProfile) =>
 
   const suggestions = React.useMemo(
     () => [
-      "Paste your resume text or type your background.",
+      "Type your background or resume",
       "Tell us your years of experience and notable roles.",
-      "List your top skills (comma-separated works!).",
+      "List your top skills.",
       "Include your education: degree, school, and graduation year.",
-      "Add achievements with metrics (e.g., “cut costs by 15%”).",
+      "Add achievements",
     ],
     []
   );
