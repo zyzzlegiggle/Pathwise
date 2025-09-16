@@ -24,6 +24,7 @@ export default [
         "error",
         { allowObjectTypes: "always" },
       ],
+      "@typescript-eslint/no-wrapper-object-types": "warn",
       "@typescript-eslint/ban-ts-comment": [
         "error",
         {
