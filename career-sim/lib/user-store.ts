@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "./db";
 import { GoogleTokens } from "./google";
 
@@ -41,7 +42,7 @@ export async function clearTokens(userId: number) {
   await prisma.user.update({
     where: { user_id: userId },
     data: {
-      googleTokens: null,
+      googleTokens: Prisma.DbNull,
       googleCalendarId: null,
       googleAccountEmail: null,
       googleScope: null,

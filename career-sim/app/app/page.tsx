@@ -181,8 +181,8 @@ export default function CareerAgentUI() {
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(280px,340px)_1fr]">
           <div className="space-y-4 lg:sticky lg:top-5">
-              <ChatWidget profile={profile} variant="compact" threadId={threadId}/>
-              <SidebarProfile profile={profile} onEdit={() => setEditing(true)} />
+              <ChatWidget profile={profile ?? { userName: "", resume: "", yearsExp: 0, skills: [], education: "" }} variant="compact" threadId={threadId}/>
+              <SidebarProfile profile={profile ?? { userName: "", resume: "", yearsExp: 0, skills: [], education: "" }} onEdit={() => setEditing(true)} />
             </div>
             <div className="space-y-6 lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto lg:[scrollbar-gutter:stable] pr-1 lg:pr-2 lg:pl-1 motion-safe:scroll-smooth">
             <Section
@@ -231,7 +231,7 @@ export default function CareerAgentUI() {
               <WeekPlan hours={hours} profile={profile} pathData={pathData ?? undefined} />
             </Section>
             <Section title="People like me" icon={<Users className="h-5 w-5" />}>
-                <PeopleLikeMe profile={profile} pathTargets={pathData?.targets} userId={me?.id ?? ""}   />
+                <PeopleLikeMe profile={profile ?? { userName: "", resume: "", yearsExp: 0, skills: [], education: "" }} pathTargets={pathData?.targets} userId={me?.id ?? ""}   />
             </Section>
             </div>
           </div>
@@ -241,7 +241,7 @@ export default function CareerAgentUI() {
 
   <ProfileEditor
     open={editing}
-    initial={profile}
+    initial={profile ?? { userName: "", resume: "", yearsExp: 0, skills: [], education: "" }}
     onClose={() => setEditing(false)}
     onSaved={(updated) => {
       setProfile(updated);
